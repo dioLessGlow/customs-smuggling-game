@@ -105,8 +105,15 @@ function renderCards(save, tutorId) {
         '<div class="cs-prog-labels"><span class="cs-prog-label">0%</span><span class="cs-prog-label center">' + progPct + '%</span><span class="cs-prog-label">100%</span></div>' +
       '</div>' +
     '</div>' +
-    '<div class="cs-action"><button class="cs-btn" id="cs-quiz-btn">📝 开始测验</button></div>';
+    '<div class="cs-action"><button class="cs-btn" id="cs-select-btn" style="background:linear-gradient(135deg,#00a87a,#008b5e);margin-bottom:6px;">✅ 选择</button><button class="cs-btn" id="cs-quiz-btn">📝 开始测验</button></div>';
 
+  document.getElementById('cs-select-btn').onclick = function () {
+    var sv = SaveManager.load();
+    sv.chosenCharacterId = tutorId;
+    SaveManager.save(sv);
+    soundManager.play('click');
+    UI.show('menu');
+  };
   document.getElementById('cs-quiz-btn').onclick = function () {
     soundManager.play('click');
     _startTutorQuiz(tutorId);
