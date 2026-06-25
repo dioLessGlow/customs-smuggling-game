@@ -21,8 +21,11 @@ const UI = {
 
 function fitApp() {
   var app = document.querySelector('#app');
-  var scale = Math.min(window.innerWidth / 390, window.innerHeight / 844);
+  var w = window.innerWidth;
+  var h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  var isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  var scale = isMobile ? w / 390 : Math.min(1, w / 390, h / 844);
   app.style.transform = 'scale(' + scale + ')';
-  app.style.left = (window.innerWidth - 390 * scale) / 2 + 'px';
-  app.style.top = (window.innerHeight - 844 * scale) / 2 + 'px';
+  app.style.left = (w - 390 * scale) / 2 + 'px';
+  app.style.top = (h - 844 * scale) / 2 + 'px';
 }

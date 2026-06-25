@@ -350,14 +350,15 @@ UI.on('level-select', function () {
       layout: root.horizontalLayout, x: 265, y: 90
     }));
     switchCont.children.push(am5.Label.new(root, {
-      centerY: am5.p50, text: "地球", fill: espresso, fontSize: 13
+      centerY: am5.p50, text: "地球", fill: espresso, fontSize: 11
     }));
     var switchBtn = switchCont.children.push(am5.Button.new(root, {
       themeTags: ["switch"], centerY: am5.p50,
-      icon: am5.Circle.new(root, { themeTags: ["icon"] })
+      icon: am5.Circle.new(root, { themeTags: ["icon"] }),
+      paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6
     }));
     switchCont.children.push(am5.Label.new(root, {
-      centerY: am5.p50, text: "地图", fill: espresso, fontSize: 13
+      centerY: am5.p50, text: "地图", fill: espresso, fontSize: 11
     }));
 
     var easing = am5.ease.inOut(am5.ease.cubic);
