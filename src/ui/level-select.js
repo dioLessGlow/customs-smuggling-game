@@ -87,7 +87,7 @@ UI.on('level-select', function () {
       rotationX: -15,
       rotationY: -20,
       minZoomLevel: 0.5,
-      zoomLevel: 0.7
+      zoomLevel: 0.9
     }));
 
     var bgSeries = chart.series.push(am5map.MapPolygonSeries.new(root, {}));
@@ -373,7 +373,7 @@ UI.on('level-select', function () {
       chart.animate({ key: "rotationX", to: -15, duration: dur, easing: easing });
       chart.animate({ key: "rotationY", to: -20, duration: dur, easing: easing });
       chart.set("minZoomLevel", 0.5);
-      chart.animate({ key: "zoomLevel", to: 0.7, duration: dur, easing: easing }).events.on("animationended", function () {
+      chart.animate({ key: "zoomLevel", to: 0.9, duration: dur, easing: easing }).events.on("animationended", function () {
         animStart = Date.now();
         rotAnim = chart.animate({
           key: "rotationX", from: -15, to: -15 + 360,
