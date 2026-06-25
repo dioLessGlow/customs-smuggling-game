@@ -24,8 +24,7 @@ function fitApp() {
   var w = window.innerWidth;
   var h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
   document.body.style.height = h + 'px';
-  var isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  var scale = isMobile ? w / 390 : Math.min(1, w / 390, h / 844);
+  var scale = Math.min(w / 390, h / 844);
   app.style.transform = 'scale(' + scale + ')';
   app.style.left = (w - 390 * scale) / 2 + 'px';
   app.style.top = (h - 844 * scale) / 2 + 'px';

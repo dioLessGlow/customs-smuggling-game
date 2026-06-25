@@ -56,11 +56,7 @@ function tideLoop() { TidesBg.update(); requestAnimationFrame(tideLoop); }
 tideLoop();
 
 fitApp();
-if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize', fitApp);
-} else {
-  window.addEventListener('resize', fitApp);
-}
+window.addEventListener('resize', function () { setTimeout(fitApp, 200); });
 SaveManager.checkDailyLogin();
 
 var saved = null;
