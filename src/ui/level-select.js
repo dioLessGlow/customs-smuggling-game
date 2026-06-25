@@ -347,7 +347,7 @@ UI.on('level-select', function () {
     zoomControl.homeButton.set("visible", true);
 
     var switchCont = chart.children.push(am5.Container.new(root, {
-      layout: root.horizontalLayout, x: 265, y: 51
+      layout: root.horizontalLayout, x: 265, y: 90
     }));
     switchCont.children.push(am5.Label.new(root, {
       centerY: am5.p50, text: "地球", fill: espresso, fontSize: 13
