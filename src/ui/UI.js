@@ -23,6 +23,7 @@ function fitApp() {
   var app = document.querySelector('#app');
   var w = window.innerWidth;
   var h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  document.body.style.height = h + 'px';
   var isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   var scale = isMobile ? w / 390 : Math.min(1, w / 390, h / 844);
   app.style.transform = 'scale(' + scale + ')';
