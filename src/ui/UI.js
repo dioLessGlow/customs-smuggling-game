@@ -21,8 +21,7 @@ const UI = {
 
 function fitApp() {
   var app = document.querySelector('#app');
-  var isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  var scale = isMobile ? window.innerWidth / 390 : Math.min(1, window.innerWidth / 390, window.innerHeight / 844);
+  var scale = Math.min(window.innerWidth / 390, window.innerHeight / 844);
   app.style.transform = 'scale(' + scale + ')';
   app.style.left = (window.innerWidth - 390 * scale) / 2 + 'px';
   app.style.top = (window.innerHeight - 844 * scale) / 2 + 'px';
