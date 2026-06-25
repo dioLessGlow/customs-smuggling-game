@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>潮汐时刻 — TIDES</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            background: #06080f;
+            font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+            cursor: default;
+        }
+
+        #ocean {
+            position: fixed;
+            inset: 0;
+            display: block;
+        }
+
+        /* ── 覆盖层 UI（仅显示时刻与氛围名称） ── */
+        .ui {
+            position: fixed;
+            top: 32px;
+            right: 40px;
+            z-index: 10;
+            pointer-events: none;
+            color: #fff;
+        }
+
+        #mood-name {
+            display: block;
+            font-size: 12px;
+            letter-spacing: 0.3em;
+            text-align: right;
+            color: rgba(255, 255, 255, 0.9);
+            text-shadow: 0 1px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        .mood-time {
+            display: block;
+            font-family: "Noto Serif SC", "Songti SC", serif;
+            font-size: 26px;
+            font-variant-numeric: tabular-nums;
+            margin-top: 2px;
+            text-align: right;
+            color: #fff;
+            text-shadow: 0 1px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        @media (max-width: 600px) {
+            .ui {
+                top: 22px;
+                right: 22px;
+            }
+
+            #mood-name {
+                font-size: 10px;
+            }
+
+            .mood-time {
+                font-size: 16px;
+            }
+        }
+    </style>
+    <base target="_blank">
+</head>
+
+<body>
+    <canvas id="ocean"></canvas>
+
+    <!-- 覆盖层 UI（仅显示时刻） -->
+    <div class="ui">
+        <span id="mood-name">金色时光</span>
+        <span class="mood-time" id="mood-time">14:24</span>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("ocean");
+        const ctx = canvas.getContext("2d");
+
+        let W, H, DPR, horizonY, oceanH;
+
+        /* ════════════════════════════════════════
+           画布尺寸与 DPR 处理
+        ════════════════════════════════════════ */
+        function resize() {
+            DPR = Math.min(window.devicePixelRatio || 1, 2);
+            W = window.innerWidth;
+            H = window.innerHeight;
+            canvas.width = W * DPR;
+            canvas.height = H * DPR;
+            canvas.style.width = W + "px";
+            canvas.style.height = H + "px";
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+            horizonY = H * 0.42;
+            oceanH = H - horizonY;
+        }
+        window.addEventListener("resize", resize);
+        resize();
+
+        /* ════════════════════════════════════════
+           调色板关键帧 (r,g,b 数组)
+           时间映射: t=0.0 对应 00:00, t=1.0 对应 24:00
+           sunH = 光源距地平线高度 (0=在地平线, 1=高空)
+           注意: t=1.0 复制 t=0.0 以实现完美循环
+        ════════════════════════════════════════ */
+        const KEYS = [
+            {
+                t: 0.0,
+                name: "子夜",
+                skyTop: [4, 6, 18],
+                skyHor: [12, 16, 36],
+                sun: [255, 248, 220],
+                glow: [120, 110, 80],
+                wFar: [18, 24, 48],
+                wNear: [4, 8, 18],
+                foam: [200, 195, 170],
+                sunH: 0.55,
+                glit: 0.4,
+                star: 1.0
+            },
+            {
+                t: 0.15,
+                name: "拂晓前",
+                skyTop: [12, 16, 38],
+                skyHor: [28, 36, 68],
+                sun: [255, 250, 225],
+                glow: [140, 130, 90],
+                wFar: [28, 36, 68],
+                wNear: [8, 14, 28],
+                foam: [210, 205, 180],
+                sunH: 0.35,
+                glit: 0.5,
+                star: 0.85
+            },
+            {
+                t: 0.21,
+                name: "黎明",
+                skyTop: [38, 44, 86],
+                skyHor: [247, 176, 128],
+                sun: [255, 238, 206],
+                glow: [255, 178, 120],
+                wFar: [176, 150, 150],
+                wNear: [34, 62, 84],
+                foam: [255, 244, 234],
+                sunH: 0.1,
+                glit: 0.7,
+                star: 0
+            },
+            {
+                t: 0.29,
+                name: "清晨",
+                skyTop: [64, 134, 206],
+                skyHor: [188, 222, 236],
+                sun: [255, 255, 246],
+                glow: [255, 250, 224],
+                wFar: [120, 186, 196],
+                wNear: [20, 92, 114],
+                foam: [255, 255, 255],
+                sunH: 0.55,
+                glit: 0.5,
+                star: 0
+            },
+            {
+                t: 0.5,
+                name: "正午",
+                skyTop: [58, 142, 214],
+                skyHor: [176, 216, 230],
+                sun: [255, 255, 248],
+                glow: [255, 252, 232],
+                wFar: [96, 178, 188],
+                wNear: [16, 96, 120],
+                foam: [255, 255, 255],
+                sunH: 0.92,
+                glit: 0.45,
+                star: 0
+            },
+            {
+                t: 0.68,
+                name: "金色时光",
+                skyTop: [74, 92, 156],
+                skyHor: [255, 202, 120],
+                sun: [255, 236, 194],
+                glow: [255, 168, 92],
+                wFar: [206, 164, 118],
+                wNear: [34, 78, 98],
+                foam: [255, 244, 228],
+                sunH: 0.3,
+                glit: 0.95,
+                star: 0
+            },
+            {
+                t: 0.79,
+                name: "日落",
+                skyTop: [48, 38, 86],
+                skyHor: [255, 108, 68],
+                sun: [255, 206, 148],
+                glow: [255, 92, 58],
+                wFar: [188, 98, 84],
+                wNear: [30, 42, 72],
+                foam: [255, 222, 200],
+                sunH: 0.06,
+                glit: 1.0,
+                star: 0.15
+            },
+            {
+                t: 0.88,
+                name: "暮光",
+                skyTop: [22, 24, 56],
+                skyHor: [58, 64, 108],
+                sun: [255, 245, 210],
+                glow: [130, 120, 80],
+                wFar: [48, 56, 92],
+                wNear: [14, 20, 42],
+                foam: [200, 195, 170],
+                sunH: 0.15,
+                glit: 0.6,
+                star: 0.6
+            },
+            {
+                t: 1.0,
+                name: "子夜",
+                skyTop: [4, 6, 18],
+                skyHor: [12, 16, 36],
+                sun: [255, 248, 220],
+                glow: [120, 110, 80],
+                wFar: [18, 24, 48],
+                wNear: [4, 8, 18],
+                foam: [200, 195, 170],
+                sunH: 0.55,
+                glit: 0.4,
+                star: 1.0
+            }
+        ];
+
+        /* ════════════════════════════════════════
+           工具函数
+        ════════════════════════════════════════ */
+        function lerp(a, b, t) {
+            return a + (b - a) * t;
+        }
+
+        function lerpRGB(a, b, t) {
+            return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+        }
+
+        function rgb(c, a = 1) {
+            return `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
+        }
+
+        function getPalette(t) {
+            let i = 0;
+            while (i < KEYS.length - 1 && t > KEYS[i + 1].t) i++;
+            const a = KEYS[i];
+            const b = KEYS[Math.min(i + 1, KEYS.length - 1)];
+            const span = b.t - a.t || 1;
+            const k = Math.max(0, Math.min(1, (t - a.t) / span));
+
+            return {
+                name: k < 0.5 ? a.name : b.name,
+                skyTop: lerpRGB(a.skyTop, b.skyTop, k),
+                skyHor: lerpRGB(a.skyHor, b.skyHor, k),
+                sun: lerpRGB(a.sun, b.sun, k),
+                glow: lerpRGB(a.glow, b.glow, k),
+                wFar: lerpRGB(a.wFar, b.wFar, k),
+                wNear: lerpRGB(a.wNear, b.wNear, k),
+                foam: lerpRGB(a.foam, b.foam, k),
+                sunH: lerp(a.sunH, b.sunH, k),
+                glit: lerp(a.glit, b.glit, k),
+                star: lerp(a.star, b.star, k)
+            };
+        }
+
+        /* ════════════════════════════════════════
+           静态元素初始化
+        ════════════════════════════════════════ */
+        const stars = Array.from({ length: 140 }, () => ({
+            x: Math.random(),
+            y: Math.random() * 0.4,
+            r: Math.random() * 1.2 + 0.3,
+            tw: Math.random() * Math.PI * 2
+        }));
+
+        const clouds = Array.from({ length: 5 }, (_, i) => ({
+            x: Math.random(),
+            y: 0.08 + Math.random() * 0.18,
+            w: 0.18 + Math.random() * 0.22,
+            speed: 0.000015 + Math.random() * 0.00002
+        }));
+
+        const birds = Array.from({ length: 4 }, () => ({
+            x: Math.random(),
+            y: 0.15 + Math.random() * 0.18,
+            speed: 0.00004 + Math.random() * 0.00004,
+            size: 8 + Math.random() * 6,
+            flap: Math.random() * Math.PI * 2
+        }));
+
+        /* ════════════════════════════════════════
+           时间自动同步系统时钟
+        ════════════════════════════════════════ */
+        let timeOfDay = 0;
+
+        function syncTime() {
+            const now = new Date();
+            timeOfDay = (now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600) / 24;
+        }
+        syncTime();
+        setInterval(syncTime, 1000);
+
+        const moodName = document.getElementById("mood-name");
+        const moodTime = document.getElementById("mood-time");
+
+        /* ════════════════════════════════════════
+           弯月绘制：左侧亮面，右侧完全透明
+        ════════════════════════════════════════ */
+        const moonCanvas = document.createElement('canvas');
+        let moonCacheSize = 0;
+        let moonCacheR = 0;
+        let moonCacheColor = null;
+
+        function drawCrescent(cx, cy, r, color) {
+            const size = Math.ceil(r * 2.6);
+            const colorKey = `${color[0] | 0},${color[1] | 0},${color[2] | 0}`;
+
+            if (size !== moonCacheSize || r !== moonCacheR || colorKey !== moonCacheColor) {
+                moonCacheSize = size;
+                moonCacheR = r;
+                moonCacheColor = colorKey;
+                moonCanvas.width = size;
+                moonCanvas.height = size;
+
+                const tctx = moonCanvas.getContext('2d');
+                const tx = size / 2;
+                const ty = size / 2;
+
+                const cutW = r * 1.05;
+                const cutOffset = r * 0.25;
+
+                // Step 1: 画月亮本体（边缘不透明，防止灰色残留）
+                const moonGrad = tctx.createRadialGradient(
+                    tx + r * 0.15, ty - r * 0.1, 0,
+                    tx, ty, r
+                );
+                moonGrad.addColorStop(0, `rgba(255,255,245,1)`);
+                moonGrad.addColorStop(0.5, `rgba(${color[0] | 0},${color[1] | 0},${color[2] | 0},1)`);
+                moonGrad.addColorStop(0.8, `rgba(${color[0] | 0},${color[1] | 0},${color[2] | 0},1)`);
+                moonGrad.addColorStop(1, `rgba(${color[0] | 0},${color[1] | 0},${color[2] | 0},1)`);
+
+                tctx.fillStyle = moonGrad;
+                tctx.beginPath();
+                tctx.arc(tx, ty, r, 0, Math.PI * 2);
+                tctx.fill();
+
+                // Step 2: 切换到 destination-out 擦除模式
+                tctx.globalCompositeOperation = 'destination-out';
+
+                // Step 3: 纯色遮罩圆从右侧挖空
+                tctx.fillStyle = 'rgba(0,0,0,1)';
+                tctx.beginPath();
+                tctx.arc(tx + cutOffset, ty, cutW, 0, Math.PI * 2);
+                tctx.fill();
+
+                // Step 4: 恢复混合模式
+                tctx.globalCompositeOperation = 'source-over';
+            }
+
+            ctx.drawImage(moonCanvas, cx - moonCacheSize / 2, cy - moonCacheSize / 2);
+        }
+
+        /* ════════════════════════════════════════
+           渲染主循环
+        ════════════════════════════════════════ */
+        let T = 0;
+
+        function draw() {
+            T += 0.016;
+            const P = getPalette(timeOfDay);
+
+            const isNight = P.star > 0.3;
+            // 太阳/月亮固定在右上角
+            const lightX = W * 0.78;
+            const lightY = horizonY - P.sunH * horizonY * 0.82;
+
+            /* ── 天空 ── */
+            const sky = ctx.createLinearGradient(0, 0, 0, horizonY + oceanH * 0.1);
+            sky.addColorStop(0, rgb(P.skyTop));
+            sky.addColorStop(0.7, rgb(lerpRGB(P.skyTop, P.skyHor, 0.55)));
+            sky.addColorStop(1, rgb(P.skyHor));
+            ctx.fillStyle = sky;
+            ctx.fillRect(0, 0, W, horizonY + 2);
+
+            /* ── 星星 ── */
+            if (P.star > 0.01) {
+                stars.forEach((s) => {
+                    const tw = 0.5 + 0.5 * Math.sin(T * 2 + s.tw);
+                    ctx.fillStyle = rgb([255, 255, 255], P.star * tw * 0.9);
+                    ctx.beginPath();
+                    ctx.arc(s.x * W, s.y * horizonY, s.r, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+            }
+
+            /* ── 光源光晕 ── */
+            const glowR = Math.min(W, H) * 0.5;
+            const g = ctx.createRadialGradient(lightX, lightY, 0, lightX, lightY, glowR);
+            if (isNight) {
+                g.addColorStop(0, rgb(P.glow, 0.18));
+                g.addColorStop(0.3, rgb(P.glow, 0.06));
+                g.addColorStop(1, rgb(P.glow, 0));
+            } else {
+                g.addColorStop(0, rgb(P.glow, 0.55));
+                g.addColorStop(0.25, rgb(P.glow, 0.22));
+                g.addColorStop(1, rgb(P.glow, 0));
+            }
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, W, horizonY + oceanH * 0.4);
+
+            /* ── 太阳/月亮本体 ── */
+            const bodyR = Math.min(W, H) * 0.045;
+            if (isNight) {
+                drawCrescent(lightX, lightY, bodyR, P.sun);
+            } else {
+                const sd = ctx.createRadialGradient(lightX, lightY, 0, lightX, lightY, bodyR);
+                sd.addColorStop(0, rgb(P.sun, 1));
+                sd.addColorStop(0.7, rgb(P.sun, 0.95));
+                sd.addColorStop(1, rgb(P.sun, 0.2));
+                ctx.fillStyle = sd;
+                ctx.beginPath();
+                ctx.arc(lightX, lightY, bodyR, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            /* ── 云朵 ── */
+            clouds.forEach((c) => {
+                c.x += c.speed;
+                if (c.x > 1.3) c.x = -0.3;
+                const cx = c.x * W;
+                const cy = c.y * horizonY;
+                const cw = c.w * W;
+                ctx.fillStyle = rgb(lerpRGB(P.skyHor, [255, 255, 255], 0.25), 0.16);
+                for (let j = 0; j < 4; j++) {
+                    ctx.beginPath();
+                    ctx.ellipse(
+                        cx + j * cw * 0.22,
+                        cy + Math.sin(j) * 6,
+                        cw * (0.3 - j * 0.04),
+                        cw * 0.06,
+                        0, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                }
+            });
+
+            /* ── 飞鸟 ── */
+            birds.forEach((b) => {
+                b.x += b.speed;
+                b.flap += 0.15;
+                if (b.x > 1.2) {
+                    b.x = -0.2;
+                    b.y = 0.15 + Math.random() * 0.18;
+                }
+                const bx = b.x * W;
+                const by = b.y * horizonY;
+                const wing = Math.sin(b.flap) * b.size * 0.5;
+                ctx.strokeStyle = rgb(lerpRGB(P.skyTop, [0, 0, 0], 0.3), 0.5);
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(bx - b.size, by + wing);
+                ctx.quadraticCurveTo(bx, by - b.size * 0.3, bx, by);
+                ctx.quadraticCurveTo(bx, by - b.size * 0.3, bx + b.size, by + wing);
+                ctx.stroke();
+            });
+
+            /* ── 地平线大气雾效 ── */
+            const haze = ctx.createLinearGradient(0, horizonY - 40, 0, horizonY + 40);
+            haze.addColorStop(0, rgb(P.skyHor, 0));
+            haze.addColorStop(0.5, rgb(P.skyHor, 0.45));
+            haze.addColorStop(1, rgb(P.wFar, 0));
+            ctx.fillStyle = haze;
+            ctx.fillRect(0, horizonY - 40, W, 80);
+
+            /* ── 海浪层 (从远到近) ── */
+            const NUM = 26;
+            for (let i = 0; i < NUM; i++) {
+                const depth = i / (NUM - 1);
+                const yTop = horizonY + Math.pow(depth, 1.9) * oceanH;
+                const amp = lerp(0.6, 30, depth);
+                const wlen = lerp(46, 340, depth);
+                const speed = lerp(0.25, 0.9, depth);
+                const phase = T * speed + i * 0.9;
+                const col = lerpRGB(P.wFar, P.wNear, depth);
+
+                ctx.beginPath();
+                ctx.moveTo(0, H);
+                ctx.lineTo(0, yTop + Math.sin(phase) * amp);
+                for (let x = 0; x <= W; x += 6) {
+                    const y = yTop +
+                        Math.sin(x / wlen + phase) * amp +
+                        Math.sin(x / (wlen * 0.4) + phase * 1.6) * amp * 0.3;
+                    ctx.lineTo(x, y);
+                }
+                ctx.lineTo(W, H);
+                ctx.closePath();
+                ctx.fillStyle = rgb(col);
+                ctx.fill();
+
+                ctx.lineWidth = lerp(0.6, 2.2, depth);
+                ctx.beginPath();
+                let started = false;
+                for (let x = 0; x <= W; x += 6) {
+                    const y = yTop +
+                        Math.sin(x / wlen + phase) * amp +
+                        Math.sin(x / (wlen * 0.4) + phase * 1.6) * amp * 0.3;
+                    started ? ctx.lineTo(x, y) : (ctx.moveTo(x, y), (started = true));
+                }
+                ctx.strokeStyle = rgb(lerpRGB(col, P.sun, 0.55), lerp(0.05, 0.3, depth));
+                ctx.stroke();
+
+                if (depth > 0.62) {
+                    const foamA = (depth - 0.62) / 0.38;
+                    for (let x = 0; x <= W; x += 9) {
+                        const y = yTop +
+                            Math.sin(x / wlen + phase) * amp +
+                            Math.sin(x / (wlen * 0.4) + phase * 1.6) * amp * 0.3;
+                        const crest = Math.sin(x / wlen + phase);
+                        if (crest > 0.55 && Math.random() > 0.45) {
+                            ctx.fillStyle = rgb(P.foam, foamA * (0.18 + Math.random() * 0.35));
+                            ctx.fillRect(
+                                x + (Math.random() - 0.5) * 6,
+                                y - Math.random() * 3,
+                                1.5 + Math.random() * 3,
+                                1.5 + Math.random() * 2
+                            );
+                        }
+                    }
+                }
+            }
+
+            /* ── 水面光源闪烁 ── */
+            const glitterCount = 220;
+            for (let i = 0; i < glitterCount; i++) {
+                const dy = Math.random();
+                const y = horizonY + Math.pow(dy, 1.5) * oceanH;
+                const spread = lerp(6, W * 0.3, dy);
+                const x = lightX + (Math.random() - 0.5) * 2 * spread;
+                const distFade = 1 - Math.min(1, Math.abs(x - lightX) / (spread + 1));
+                const flick = 0.25 + Math.random() * 0.75;
+                const a = distFade * distFade * flick * P.glit * (1 - dy * 0.25);
+                if (a < 0.02) continue;
+                ctx.fillStyle = rgb(P.sun, a * 0.85);
+                const len = 1 + Math.random() * (2 + dy * 4);
+                ctx.fillRect(x, y, len, 1 + dy);
+            }
+
+            /* ── 暗角效果 ── */
+            const vig = ctx.createRadialGradient(
+                W / 2, H * 0.55, H * 0.25,
+                W / 2, H * 0.55, H * 0.9
+            );
+            vig.addColorStop(0, "rgba(0,0,0,0)");
+            vig.addColorStop(1, "rgba(0,0,8,0.34)");
+            ctx.fillStyle = vig;
+            ctx.fillRect(0, 0, W, H);
+
+            /* ── UI 文字更新 ── */
+            moodName.textContent = P.name;
+            const hours = timeOfDay * 24;
+            const hh = Math.floor(hours) % 24;
+            const mm = Math.floor((hours % 1) * 60);
+            moodTime.textContent = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+
+            requestAnimationFrame(draw);
+        }
+
+        draw();
+    </script>
+</body>
+
+</html>

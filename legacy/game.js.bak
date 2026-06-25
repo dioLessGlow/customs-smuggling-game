@@ -1,0 +1,924 @@
+// ============================================
+// 缉私终焉 · 初始版本
+// Phaser 3 + 原生 JavaScript
+// ============================================
+
+const SAVE_KEY = 'anti_smuggling_save_v1';
+
+// ---------- 存档系统 ----------
+const SaveManager = {
+    load() {
+        try {
+            const raw = localStorage.getItem(SAVE_KEY);
+            if (raw) return JSON.parse(raw);
+        } catch(e) {}
+        return this.getDefault();
+    },
+
+    getDefault() {
+        return {
+            unlocked: ['human_rat'],
+            completed: [],
+            totalScore: 0,
+            bestScores: {},
+            fragments: [],
+            settings: { sound: true, vibration: true },
+            lastPlayed: Date.now()
+        };
+    },
+
+    save(data) {
+        try {
+            localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+        } catch(e) {
+            console.warn('存档失败:', e);
+        }
+    }
+};
+
+// ---------- 音效管理器（Web Audio API） ----------
+class SoundManager {
+    constructor() {
+        this.ctx = null;
+        this.enabled = true;
+        this.initialized = false;
+    }
+
+    init() {
+        if (this.initialized) return;
+        try {
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            this.initialized = true;
+        } catch(e) {
+            console.warn('音频初始化失败');
+        }
+    }
+
+    play(type) {
+        if (!this.enabled || !this.ctx) return;
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+
+        switch(type) {
+            case 'correct': this._playTone(880, 1760, 0.3, 'sine'); break;
+            case 'wrong': this._playTone(150, 100, 0.5, 'sawtooth'); break;
+            case 'alarm': this._playSiren(); break;
+            case 'click': this._playTone(600, 800, 0.1, 'sine'); break;
+            case 'levelup': this._playTone(523, 1047, 0.4, 'sine'); break;
+            case 'scan': this._playTone(1200, 1800, 0.2, 'square'); break;
+        }
+    }
+
+    _playTone(startFreq, endFreq, duration, type = 'sine') {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.frequency.setValueAtTime(startFreq, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(endFreq, this.ctx.currentTime + duration * 0.3);
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+        osc.start();
+        osc.stop(this.ctx.currentTime + duration);
+    }
+
+    _playSiren() {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.frequency.setValueAtTime(440, this.ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(880, this.ctx.currentTime + 0.2);
+        osc.frequency.linearRampToValueAtTime(440, this.ctx.currentTime + 0.4);
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.6);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.6);
+    }
+}
+
+const soundManager = new SoundManager();
+
+// ---------- 弹出文字效果 ----------
+class PopupText extends Phaser.GameObjects.Text {
+    constructor(scene, x, y, text, color = '#ffffff', size = 28) {
+        super(scene, x, y, text, {
+            fontSize: size + 'px',
+            fontFamily: 'Arial Black, "PingFang SC", sans-serif',
+            color: color,
+            stroke: '#000000',
+            strokeThickness: 3,
+            fontStyle: 'bold'
+        });
+        scene.add.existing(this);
+        this.setOrigin(0.5);
+
+        scene.tweens.add({
+            targets: this,
+            y: y - 60,
+            scale: 1.3,
+            alpha: 0,
+            duration: 800,
+            ease: 'Power2',
+            onComplete: () => this.destroy()
+        });
+    }
+}
+
+// ============================================
+// 场景：启动加载
+// ============================================
+class BootScene extends Phaser.Scene {
+    constructor() { super({ key: 'BootScene' }); }
+
+    preload() {
+        // 创建程序化纹理（无需外部图片）
+        this._createTextures();
+    }
+
+    _createTextures() {
+        const { width, height } = this.scale;
+
+        // 行李纹理
+        const luggageGraphics = this.make.graphics({ x: 0, y: 0, add: false });
+        luggageGraphics.fillStyle(0x8B6914);
+        luggageGraphics.fillRoundedRect(0, 0, 120, 100, 10);
+        luggageGraphics.fillStyle(0x6B4E0A);
+        luggageGraphics.fillRoundedRect(10, 10, 100, 80, 5);
+        luggageGraphics.fillStyle(0x4A3506);
+        luggageGraphics.fillRect(45, 0, 30, 20);
+        luggageGraphics.generateTexture('luggage', 120, 100);
+
+        // 扫描框
+        const scanGraphics = this.make.graphics({ x: 0, y: 0, add: false });
+        scanGraphics.lineStyle(3, 0x00e676);
+        scanGraphics.strokeRect(0, 0, 160, 140);
+        scanGraphics.lineStyle(2, 0x00e676, 0.5);
+        scanGraphics.strokeRect(10, 10, 140, 120);
+        scanGraphics.generateTexture('scanFrame', 160, 140);
+
+        // 扫描线
+        const scanLine = this.make.graphics({ x: 0, y: 0, add: false });
+        scanLine.fillStyle(0x00e676, 0.6);
+        scanLine.fillRect(0, 0, 160, 3);
+        scanLine.generateTexture('scanLine', 160, 3);
+
+        // 粒子光点
+        const flare = this.make.graphics({ x: 0, y: 0, add: false });
+        flare.fillStyle(0xffffff);
+        flare.fillCircle(8, 8, 8);
+        flare.generateTexture('flare', 16, 16);
+
+        // 印章纹理
+        const stamp = this.make.graphics({ x: 0, y: 0, add: false });
+        stamp.lineStyle(4, 0xff0000);
+        stamp.strokeCircle(40, 40, 35);
+        stamp.lineStyle(2, 0xff0000);
+        stamp.strokeCircle(40, 40, 28);
+        stamp.generateTexture('stamp', 80, 80);
+
+        // 背景装饰
+        const bgDecor = this.make.graphics({ x: 0, y: 0, add: false });
+        for (let i = 0; i < 50; i++) {
+            const alpha = Phaser.Math.FloatBetween(0.03, 0.08);
+            bgDecor.fillStyle(0x4ecca3, alpha);
+            bgDecor.fillCircle(
+                Phaser.Math.Between(0, width),
+                Phaser.Math.Between(0, height),
+                Phaser.Math.Between(1, 3)
+            );
+        }
+        bgDecor.generateTexture('bgStars', width, height);
+    }
+
+    create() {
+        // 预加载完成后进入主菜单
+        this.scene.start('MenuScene');
+    }
+}
+
+// ============================================
+// 场景：主菜单
+// ============================================
+class MenuScene extends Phaser.Scene {
+    constructor() { super({ key: 'MenuScene' }); }
+
+    create() {
+        const { width, height } = this.scale;
+        const save = SaveManager.load();
+
+        // 背景
+        this.add.rectangle(width/2, height/2, width, height, 0x0f172a);
+        this.add.image(width/2, height/2, 'bgStars').setAlpha(0.5);
+
+        // 标题
+        this.add.text(width/2, 80, '缉私终焉', {
+            fontSize: '48px',
+            fontFamily: 'Arial Black, "PingFang SC", sans-serif',
+            color: '#ffd700',
+            stroke: '#b8860b',
+            strokeThickness: 4
+        }).setOrigin(0.5);
+
+        this.add.text(width/2, 140, '岐青乡望 · 反走私创意大赛', {
+            fontSize: '14px',
+            color: '#94a3b8'
+        }).setOrigin(0.5);
+
+        // 三级难度选择
+        const levels = [
+            { key: 'human', name: '人级', desc: '初入缉私', color: 0x4ecca3, unlocked: true, y: 240 },
+            { key: 'earth', name: '地级', desc: '需通关人级', color: 0xf59e0b, unlocked: save.completed.includes('human_rat'), y: 340 },
+            { key: 'heaven', name: '天级', desc: '需通关地级', color: 0xe94560, unlocked: false, y: 440 }
+        ];
+
+        levels.forEach(level => {
+            const container = this.add.container(width/2, level.y);
+
+            const bg = this.add.rectangle(0, 0, 280, 70, level.unlocked ? level.color : 0x334155)
+                .setInteractive({ useHandCursor: level.unlocked })
+                .setAlpha(level.unlocked ? 1 : 0.4);
+
+            const nameText = this.add.text(0, -10, level.name, {
+                fontSize: '24px',
+                fontFamily: 'Arial Black, sans-serif',
+                color: '#ffffff'
+            }).setOrigin(0.5);
+
+            const descText = this.add.text(0, 18, level.unlocked ? level.desc : '🔒 ' + level.desc, {
+                fontSize: '13px',
+                color: level.unlocked ? '#ffffff' : '#64748b'
+            }).setOrigin(0.5);
+
+            container.add([bg, nameText, descText]);
+
+            if (level.unlocked) {
+                bg.on('pointerdown', () => {
+                    soundManager.play('click');
+                    if (level.key === 'human') {
+                        this.scene.start('LevelSelectScene', { tier: 'human' });
+                    }
+                });
+
+                bg.on('pointerover', () => {
+                    this.tweens.add({ targets: container, scale: 1.05, duration: 100 });
+                    bg.setFillStyle(0xffffff, 0.1);
+                });
+
+                bg.on('pointerout', () => {
+                    this.tweens.add({ targets: container, scale: 1, duration: 100 });
+                    bg.setFillStyle(level.color);
+                });
+            }
+        });
+
+        // 底部信息
+        this.add.text(width/2, height - 40, `总积分: ${save.totalScore}`, {
+            fontSize: '16px',
+            color: '#ffd700'
+        }).setOrigin(0.5);
+
+        // 首次点击初始化音频
+        this.input.once('pointerdown', () => {
+            soundManager.init();
+        });
+    }
+}
+
+// ============================================
+// 场景：关卡选择
+// ============================================
+class LevelSelectScene extends Phaser.Scene {
+    constructor() { super({ key: 'LevelSelectScene' }); }
+
+    init(data) {
+        this.tier = data.tier || 'human';
+    }
+
+    create() {
+        const { width, height } = this.scale;
+        const save = SaveManager.load();
+
+        this.add.rectangle(width/2, height/2, width, height, 0x0f172a);
+
+        // 返回按钮
+        const backBtn = this.add.text(20, 20, '← 返回', {
+            fontSize: '16px', color: '#94a3b8'
+        }).setInteractive({ useHandCursor: true });
+        backBtn.on('pointerdown', () => {
+            soundManager.play('click');
+            this.scene.start('MenuScene');
+        });
+
+        // 标题
+        const tierNames = { human: '人级 · 初入缉私', earth: '地级 · 深入调查', heaven: '天级 · 终局之战' };
+        this.add.text(width/2, 70, tierNames[this.tier], {
+            fontSize: '28px', fontFamily: 'Arial Black, sans-serif', color: '#ffd700'
+        }).setOrigin(0.5);
+
+        // 人级关卡列表（MVP只做人鼠）
+        const levels = [
+            { id: 'human_rat', name: '鼠窃', desc: '水客夹带', icon: '🐭', unlocked: true },
+            { id: 'human_ox', name: '牛冻', desc: '冻品走私', icon: '🐂', unlocked: false },
+            { id: 'human_tiger', name: '虎牙', desc: '象牙制品', icon: '🐯', unlocked: false },
+            { id: 'human_rabbit', name: '兔穴', desc: '异宠走私', icon: '🐰', unlocked: false },
+            { id: 'human_dragon', name: '龙火', desc: '枪支弹药', icon: '🐲', unlocked: false },
+            { id: 'human_snake', name: '蛇毒', desc: '毒品走私', icon: '🐍', unlocked: false }
+        ];
+
+        const startY = 140;
+        const gap = 90;
+
+        levels.forEach((level, index) => {
+            const y = startY + index * gap;
+            const container = this.add.container(width/2, y);
+
+            const bg = this.add.rectangle(0, 0, 300, 70, level.unlocked ? 0x1e293b : 0x0f172a)
+                .setStrokeStyle(2, level.unlocked ? 0x4ecca3 : 0x334155)
+                .setInteractive({ useHandCursor: level.unlocked });
+
+            const icon = this.add.text(-120, 0, level.icon, { fontSize: '32px' }).setOrigin(0.5);
+            const name = this.add.text(-50, -10, level.name, {
+                fontSize: '20px', color: '#ffffff', fontFamily: 'Arial Black, sans-serif'
+            }).setOrigin(0, 0.5);
+            const desc = this.add.text(-50, 15, level.desc, {
+                fontSize: '13px', color: '#94a3b8'
+            }).setOrigin(0, 0.5);
+
+            const status = save.completed.includes(level.id) 
+                ? this.add.text(110, 0, '✓', { fontSize: '24px', color: '#00e676' }).setOrigin(0.5)
+                : this.add.text(110, 0, level.unlocked ? '▶' : '🔒', { 
+                    fontSize: '20px', 
+                    color: level.unlocked ? '#ffd700' : '#475569' 
+                  }).setOrigin(0.5);
+
+            container.add([bg, icon, name, desc, status]);
+
+            if (level.unlocked) {
+                bg.on('pointerdown', () => {
+                    soundManager.play('click');
+                    this.scene.start('RatScene');
+                });
+
+                bg.on('pointerover', () => {
+                    bg.setStrokeStyle(3, 0xffffff);
+                    this.tweens.add({ targets: container, x: width/2 + 5, duration: 100 });
+                });
+
+                bg.on('pointerout', () => {
+                    bg.setStrokeStyle(2, 0x4ecca3);
+                    this.tweens.add({ targets: container, x: width/2, duration: 100 });
+                });
+            }
+        });
+    }
+}
+
+// ============================================
+// 场景：人鼠 · 鼠窃（水客夹带）
+// ============================================
+class RatScene extends Phaser.Scene {
+    constructor() { super({ key: 'RatScene' }); }
+
+    init() {
+        this.levelId = 'human_rat';
+        this.timeLimit = 60;
+        this.itemsPerWave = 5;
+        this.requiredCorrect = 4;
+        this.currentItem = 0;
+        this.score = 0;
+        this.correctCount = 0;
+        this.wrongCount = 0;
+        this.gameState = 'waiting'; // waiting, scanning, judging, result
+        this.revealedHiddenRule = false;
+
+        // 物品数据库
+        this.items = [
+            { name: '普通手机', icon: '📱', type: 'legal', desc: '普通电子产品' },
+            { name: '普通书籍', icon: '📚', type: 'legal', desc: '文化用品' },
+            { name: '普通衣物', icon: '👕', type: 'legal', desc: '纺织品' },
+            { name: '普通零食', icon: '🍫', type: 'legal', desc: '食品' },
+            { name: '走私香烟', icon: '🚬', type: 'illegal', desc: '超量携带烟草' },
+            { name: '走私冻肉', icon: '🥩', type: 'illegal', desc: '未经检疫冻品' },
+            { name: '象牙制品', icon: '🐘', type: 'illegal', desc: '濒危物种制品' }
+        ];
+
+        // 生成5件物品的序列（前2件明显合法，第3件走私，后2件混合）
+        this.itemSequence = this._generateSequence();
+    }
+
+    _generateSequence() {
+        const legal = this.items.filter(i => i.type === 'legal');
+        const illegal = this.items.filter(i => i.type === 'illegal');
+
+        return [
+            Phaser.Utils.Array.GetRandom(legal),      // 第1件：明显合法
+            Phaser.Utils.Array.GetRandom(legal),      // 第2件：明显合法
+            Phaser.Utils.Array.GetRandom(illegal),    // 第3件：走私（隐藏规则点）
+            Phaser.Utils.Array.GetRandom([...legal, ...illegal]), // 第4件：随机
+            Phaser.Utils.Array.GetRandom([...legal, ...illegal])  // 第5件：随机
+        ];
+    }
+
+    create() {
+        const { width, height } = this.scale;
+
+        // 背景
+        this.add.rectangle(width/2, height/2, width, height, 0x0f172a);
+        this.add.image(width/2, height/2, 'bgStars').setAlpha(0.3);
+
+        // 顶部信息栏
+        this._createHUD();
+
+        // 扫描区域
+        this._createScanArea();
+
+        // 操作按钮
+        this._createButtons();
+
+        // 显示第一件物品
+        this.time.delayedCall(500, () => this._showItem());
+
+        // 倒计时
+        this.timeEvent = this.time.addEvent({
+            delay: 1000,
+            callback: this._onTick,
+            callbackScope: this,
+            loop: true
+        });
+    }
+
+    _createHUD() {
+        const { width } = this.scale;
+
+        // 关卡名
+        this.add.text(width/2, 30, '人鼠 · 鼠窃', {
+            fontSize: '20px', fontFamily: 'Arial Black, sans-serif', color: '#ffd700'
+        }).setOrigin(0.5);
+
+        this.add.text(width/2, 55, '水客夹带', {
+            fontSize: '13px', color: '#94a3b8'
+        }).setOrigin(0.5);
+
+        // 时间
+        this.timeText = this.add.text(30, 90, `⏱ ${this.timeLimit}`, {
+            fontSize: '18px', color: '#ffffff', fontFamily: 'monospace'
+        });
+
+        // 进度
+        this.progressText = this.add.text(width - 30, 90, `📦 0/${this.itemsPerWave}`, {
+            fontSize: '16px', color: '#94a3b8'
+        }).setOrigin(1, 0);
+
+        // 得分
+        this.scoreText = this.add.text(width/2, 90, '0', {
+            fontSize: '22px', color: '#ffd700', fontFamily: 'Arial Black, sans-serif'
+        }).setOrigin(0.5, 0);
+    }
+
+    _createScanArea() {
+        const { width, height } = this.scale;
+        const cx = width / 2;
+        const cy = height / 2 - 30;
+
+        // 扫描框
+        this.scanFrame = this.add.image(cx, cy, 'scanFrame');
+
+        // 行李
+        this.luggageSprite = this.add.image(cx, cy, 'luggage')
+            .setScale(0)
+            .setAlpha(0);
+
+        // 物品图标（emoji）
+        this.itemIcon = this.add.text(cx, cy - 10, '', {
+            fontSize: '64px'
+        }).setOrigin(0.5).setAlpha(0);
+
+        // 物品名称
+        this.itemName = this.add.text(cx, cy + 50, '', {
+            fontSize: '18px', color: '#ffffff', fontFamily: 'Arial Black, sans-serif'
+        }).setOrigin(0.5).setAlpha(0);
+
+        // 扫描线动画
+        this.scanLine = this.add.image(cx, cy - 70, 'scanLine')
+            .setAlpha(0);
+
+        // 印章（扣押时显示）
+        this.stamp = this.add.image(cx, cy, 'stamp')
+            .setScale(2)
+            .setAlpha(0)
+            .setRotation(-0.3);
+    }
+
+    _createButtons() {
+        const { width, height } = this.scale;
+        const btnY = height - 120;
+
+        // 放行按钮（绿色）
+        this.passBtn = this.add.container(width/2 - 90, btnY);
+        const passBg = this.add.rectangle(0, 0, 140, 60, 0x00e676)
+            .setInteractive({ useHandCursor: true });
+        const passText = this.add.text(0, 0, '✅ 放行', {
+            fontSize: '20px', color: '#000000', fontFamily: 'Arial Black, sans-serif'
+        }).setOrigin(0.5);
+        this.passBtn.add([passBg, passText]);
+
+        // 扣押按钮（红色）
+        this.seizeBtn = this.add.container(width/2 + 90, btnY);
+        const seizeBg = this.add.rectangle(0, 0, 140, 60, 0xff4444)
+            .setInteractive({ useHandCursor: true });
+        const seizeText = this.add.text(0, 0, '🚫 扣押', {
+            fontSize: '20px', color: '#ffffff', fontFamily: 'Arial Black, sans-serif'
+        }).setOrigin(0.5);
+        this.seizeBtn.add([seizeBg, seizeText]);
+
+        // 按钮事件
+        passBg.on('pointerdown', () => this._judge('pass'));
+        seizeBg.on('pointerdown', () => this._judge('seize'));
+
+        // 按钮悬停效果
+        [passBg, seizeBg].forEach(bg => {
+            bg.on('pointerover', () => {
+                this.tweens.add({ targets: bg, scale: 1.05, duration: 100 });
+            });
+            bg.on('pointerout', () => {
+                this.tweens.add({ targets: bg, scale: 1, duration: 100 });
+            });
+        });
+
+        this._setButtonsEnabled(false);
+    }
+
+    _setButtonsEnabled(enabled) {
+        this.passBtn.list[0].input.enabled = enabled;
+        this.seizeBtn.list[0].input.enabled = enabled;
+        this.passBtn.setAlpha(enabled ? 1 : 0.4);
+        this.seizeBtn.setAlpha(enabled ? 1 : 0.4);
+    }
+
+    _showItem() {
+        if (this.currentItem >= this.itemsPerWave) {
+            this._endLevel();
+            return;
+        }
+
+        const item = this.itemSequence[this.currentItem];
+        this.gameState = 'scanning';
+
+        // 更新进度
+        this.progressText.setText(`📦 ${this.currentItem + 1}/${this.itemsPerWave}`);
+
+        // 扫描动画
+        this.tweens.add({
+            targets: [this.luggageSprite, this.itemIcon, this.itemName],
+            alpha: 1,
+            scale: 1,
+            duration: 300,
+            ease: 'Back.out'
+        });
+
+        this.luggageSprite.setScale(0);
+        this.itemIcon.setText(item.icon);
+        this.itemName.setText('? ? ?');  // 不直接显示名称，增加悬念
+
+        // 扫描线动画
+        this.scanLine.setAlpha(1);
+        this.tweens.add({
+            targets: this.scanLine,
+            y: this.scanLine.y + 140,
+            duration: 1000,
+            ease: 'Linear',
+            yoyo: true,
+            repeat: 0,
+            onComplete: () => {
+                this.scanLine.setAlpha(0);
+                this.itemName.setText(item.name);
+                this._setButtonsEnabled(true);
+                this.gameState = 'judging';
+            }
+        });
+
+        soundManager.play('scan');
+    }
+
+    _judge(choice) {
+        if (this.gameState !== 'judging') return;
+
+        this._setButtonsEnabled(false);
+        this.gameState = 'result';
+
+        const item = this.itemSequence[this.currentItem];
+        const isIllegal = item.type === 'illegal';
+        const isCorrect = (choice === 'seize' && isIllegal) || (choice === 'pass' && !isIllegal);
+
+        const cx = this.scale.width / 2;
+        const cy = this.scale.height / 2 - 30;
+
+        if (isCorrect) {
+            // 正确反馈
+            this.score += 10;
+            this.correctCount++;
+            soundManager.play('correct');
+
+            new PopupText(this, cx, cy - 40, '+10', '#00e676');
+
+            // 绿色粒子
+            const particles = this.add.particles(cx, cy, 'flare', {
+                speed: { min: 50, max: 150 },
+                angle: { min: 0, max: 360 },
+                scale: { start: 0.3, end: 0 },
+                lifespan: 500,
+                quantity: 12,
+                tint: 0x00e676
+            });
+            this.time.delayedCall(500, () => particles.destroy());
+
+            // 如果是扣押正确，盖印章
+            if (choice === 'seize') {
+                this.tweens.add({
+                    targets: this.stamp,
+                    alpha: 1,
+                    scale: 1,
+                    rotation: -0.1,
+                    duration: 200,
+                    ease: 'Bounce.out',
+                    onComplete: () => {
+                        this.time.delayedCall(300, () => {
+                            this.tweens.add({
+                                targets: this.stamp,
+                                alpha: 0,
+                                duration: 200
+                            });
+                        });
+                    }
+                });
+                this.stamp.setScale(3);
+            }
+
+        } else {
+            // 错误反馈
+            this.score = Math.max(0, this.score - 5);
+            this.wrongCount++;
+            soundManager.play('wrong');
+
+            new PopupText(this, cx, cy - 40, '-5', '#ff4444');
+
+            // 屏幕震动
+            this.cameras.main.shake(200, 0.01);
+
+            // 红色闪烁
+            const flash = this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0xff0000, 0.2)
+                .setOrigin(0).setScrollFactor(0);
+            this.tweens.add({
+                targets: flash,
+                alpha: 0,
+                duration: 300,
+                onComplete: () => flash.destroy()
+            });
+        }
+
+        // 更新分数显示
+        this.scoreText.setText(this.score);
+
+        // 隐藏当前物品
+        this.tweens.add({
+            targets: [this.luggageSprite, this.itemIcon, this.itemName],
+            alpha: 0,
+            scale: 0.8,
+            duration: 200,
+            delay: 600,
+            onComplete: () => {
+                this.currentItem++;
+                this.stamp.setAlpha(0).setRotation(-0.3);
+                this.time.delayedCall(300, () => this._showItem());
+            }
+        });
+
+        // 隐藏规则揭示（第3件正确扣押时）
+        if (this.currentItem === 2 && isCorrect && choice === 'seize' && !this.revealedHiddenRule) {
+            this.revealedHiddenRule = true;
+            this.time.delayedCall(1000, () => this._showHiddenRule());
+        }
+    }
+
+    _showHiddenRule() {
+        const { width, height } = this.scale;
+
+        // 半透明遮罩
+        const overlay = this.add.rectangle(width/2, height/2, width, height, 0x000000, 0.7);
+
+        // 规则卡片
+        const card = this.add.container(width/2, height/2);
+        const cardBg = this.add.rectangle(0, 0, 320, 200, 0x1e293b).setStrokeStyle(2, 0xffd700);
+        const title = this.add.text(0, -60, '💡 隐藏规则发现', {
+            fontSize: '20px', color: '#ffd700', fontFamily: 'Arial Black, sans-serif'
+        }).setOrigin(0.5);
+        const content = this.add.text(0, 0, '走私者会故意在前2件放明显合法物品
+消耗你的注意力
+
+第3件往往是真货！', {
+            fontSize: '14px', color: '#e2e8f0', align: 'center', lineSpacing: 8
+        }).setOrigin(0.5);
+        const hint = this.add.text(0, 70, '点击继续', {
+            fontSize: '13px', color: '#64748b'
+        }).setOrigin(0.5);
+
+        card.add([cardBg, title, content, hint]);
+
+        // 脉冲动画
+        this.tweens.add({
+            targets: hint,
+            alpha: 0.3,
+            duration: 800,
+            yoyo: true,
+            repeat: -1
+        });
+
+        // 点击继续
+        this.input.once('pointerdown', () => {
+            soundManager.play('click');
+            this.tweens.add({
+                targets: [overlay, card],
+                alpha: 0,
+                duration: 200,
+                onComplete: () => {
+                    overlay.destroy();
+                    card.destroy();
+                }
+            });
+        });
+    }
+
+    _onTick() {
+        this.timeLimit--;
+        this.timeText.setText(`⏱ ${this.timeLimit}`);
+
+        if (this.timeLimit <= 10) {
+            this.timeText.setColor('#ff4444');
+        }
+
+        if (this.timeLimit <= 0) {
+            this._endLevel();
+        }
+    }
+
+    _endLevel() {
+        this.timeEvent.remove();
+
+        const passed = this.correctCount >= this.requiredCorrect;
+
+        // 保存成绩
+        const save = SaveManager.load();
+        save.totalScore += this.score;
+        if (!save.bestScores[this.levelId] || save.bestScores[this.levelId].score < this.score) {
+            save.bestScores[this.levelId] = { score: this.score, correct: this.correctCount };
+        }
+        if (passed && !save.completed.includes(this.levelId)) {
+            save.completed.push(this.levelId);
+        }
+        SaveManager.save(save);
+
+        // 进入结算场景
+        this.scene.start('ResultScene', {
+            levelId: this.levelId,
+            score: this.score,
+            correct: this.correctCount,
+            wrong: this.wrongCount,
+            passed: passed,
+            hiddenRule: this.revealedHiddenRule
+        });
+    }
+}
+
+// ============================================
+// 场景：结算
+// ============================================
+class ResultScene extends Phaser.Scene {
+    constructor() { super({ key: 'ResultScene' }); }
+
+    init(data) {
+        this.result = data;
+    }
+
+    create() {
+        const { width, height } = this.scale;
+        const { score, correct, wrong, passed, hiddenRule } = this.result;
+
+        // 背景
+        this.add.rectangle(width/2, height/2, width, height, 0x0f172a);
+
+        // 结果标题
+        const titleColor = passed ? '#00e676' : '#ff4444';
+        const titleText = passed ? '关卡通过' : '关卡失败';
+        this.add.text(width/2, 100, titleText, {
+            fontSize: '40px', fontFamily: 'Arial Black, sans-serif', color: titleColor
+        }).setOrigin(0.5);
+
+        // 星级评定
+        let stars = 0;
+        if (passed) {
+            stars = correct === 5 ? 3 : correct >= 4 ? 2 : 1;
+        }
+        const starText = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
+        this.add.text(width/2, 160, starText, { fontSize: '32px' }).setOrigin(0.5);
+
+        // 统计信息
+        const stats = [
+            { label: '得分', value: score },
+            { label: '正确', value: correct, color: '#00e676' },
+            { label: '错误', value: wrong, color: '#ff4444' }
+        ];
+
+        stats.forEach((stat, i) => {
+            const y = 230 + i * 50;
+            this.add.text(width/2 - 60, y, stat.label, {
+                fontSize: '18px', color: '#94a3b8'
+            }).setOrigin(0, 0.5);
+            this.add.text(width/2 + 60, y, String(stat.value), {
+                fontSize: '24px', color: stat.color || '#ffffff', fontFamily: 'Arial Black, sans-serif'
+            }).setOrigin(1, 0.5);
+        });
+
+        // 隐藏规则提示
+        if (hiddenRule) {
+            this.add.text(width/2, 420, '💡 已发现隐藏规则', {
+                fontSize: '14px', color: '#ffd700'
+            }).setOrigin(0.5);
+        }
+
+        // 按钮
+        const btnY = height - 120;
+
+        // 再来一次
+        const retryBtn = this.add.container(width/2 - 80, btnY);
+        const retryBg = this.add.rectangle(0, 0, 130, 50, 0x3b82f6)
+            .setInteractive({ useHandCursor: true });
+        const retryText = this.add.text(0, 0, '↻ 再来', {
+            fontSize: '18px', color: '#ffffff', fontFamily: 'Arial Black, sans-serif'
+        }).setOrigin(0.5);
+        retryBtn.add([retryBg, retryText]);
+
+        // 返回菜单
+        const menuBtn = this.add.container(width/2 + 80, btnY);
+        const menuBg = this.add.rectangle(0, 0, 130, 50, 0x334155)
+            .setInteractive({ useHandCursor: true });
+        const menuText = this.add.text(0, 0, '← 菜单', {
+            fontSize: '18px', color: '#ffffff', fontFamily: 'Arial Black, sans-serif'
+        }).setOrigin(0.5);
+        menuBtn.add([menuBg, menuText]);
+
+        retryBg.on('pointerdown', () => {
+            soundManager.play('click');
+            this.scene.start('RatScene');
+        });
+
+        menuBg.on('pointerdown', () => {
+            soundManager.play('click');
+            this.scene.start('MenuScene');
+        });
+
+        [retryBg, menuBg].forEach(bg => {
+            bg.on('pointerover', () => {
+                this.tweens.add({ targets: bg, scale: 1.05, duration: 100 });
+            });
+            bg.on('pointerout', () => {
+                this.tweens.add({ targets: bg, scale: 1, duration: 100 });
+            });
+        });
+
+        // 通关特效
+        if (passed) {
+            soundManager.play('levelup');
+            const particles = this.add.particles(width/2, height/2, 'flare', {
+                speed: { min: 80, max: 200 },
+                angle: { min: 0, max: 360 },
+                scale: { start: 0.4, end: 0 },
+                lifespan: 1000,
+                quantity: 30,
+                tint: [0x00e676, 0xffd700, 0x4ecca3]
+            });
+            this.time.delayedCall(1000, () => particles.destroy());
+        }
+    }
+}
+
+// ============================================
+// Phaser 配置
+// ============================================
+const config = {
+    type: Phaser.AUTO,
+    width: 375,
+    height: 667,
+    parent: 'game-container',
+    backgroundColor: '#0f172a',
+    scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        min: { width: 320, height: 480 },
+        max: { width: 430, height: 932 }
+    },
+    scene: [BootScene, MenuScene, LevelSelectScene, RatScene, ResultScene]
+};
+
+const game = new Phaser.Game(config);

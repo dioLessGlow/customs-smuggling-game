@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>角色图鉴</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Nunito:wght@400;600;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: #060e1f;
+            min-height: 100vh;
+            font-family: 'Nunito', sans-serif;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        .hsr-wrap {
+            width: 100%;
+            background: linear-gradient(135deg, #0a1628 0%, #0d2044 50%, #0a1628 100%);
+            overflow: hidden;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        .hsr-wrap::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(ellipse at 30% 20%, rgba(0, 200, 255, 0.06) 0%, transparent 60%),
+                radial-gradient(ellipse at 70% 80%, rgba(0, 120, 255, 0.04) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .hsr-wrap>* {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 顶部标题栏 */
+        .hsr-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 16px 0;
+        }
+
+        .hsr-logo-box {
+            background: linear-gradient(135deg, #1a3a6e, #0d2044);
+            border: 1.5px solid #2a5aaa;
+            border-radius: 10px;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .hsr-eyebrow {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            color: #4ab3e0;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .hsr-eyebrow::after {
+            content: '▶▶▶';
+            font-size: 7px;
+            color: #2a6aaa;
+        }
+
+        .hsr-main-title {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: #e8f4ff;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            line-height: 1.1;
+        }
+
+        /* 横向滚动标签栏 */
+        .hsr-tabs-row {
+            display: flex;
+            gap: 6px;
+            padding: 12px 16px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .hsr-tabs-row::-webkit-scrollbar {
+            display: none;
+        }
+
+        .hsr-tab {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            border: 1.5px solid #2a5aaa;
+            background: rgba(20, 40, 80, 0.8);
+            color: #a8d0f0;
+            transition: all 0.18s ease;
+            white-space: nowrap;
+            user-select: none;
+            flex-shrink: 0;
+            text-align: center;
+        }
+
+        .hsr-tab:hover:not(.active) {
+            background: rgba(40, 80, 160, 0.6);
+            color: #d0eaff;
+            border-color: #4a8adc;
+        }
+
+        .hsr-tab.active {
+            background: linear-gradient(135deg, #00d4a0, #00b886);
+            color: #002a1a;
+            border-color: #00e8b0;
+        }
+
+        /* 角色选择器（横向滚动头像） */
+        .hsr-char-selector {
+            padding: 0 16px 12px;
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .hsr-char-selector::-webkit-scrollbar {
+            display: none;
+        }
+
+        .hsr-char-avatar {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 10px;
+            border: 2px solid transparent;
+            transition: all 0.16s ease;
+            flex-shrink: 0;
+            min-width: 64px;
+        }
+
+        .hsr-char-avatar:hover {
+            background: rgba(30, 70, 140, 0.35);
+        }
+
+        .hsr-char-avatar.active {
+            background: linear-gradient(135deg, rgba(0, 200, 160, 0.18), rgba(0, 150, 120, 0.08));
+            border-color: #00d4a0;
+        }
+
+        .hsr-char-avatar .avatar-circle {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: rgba(30, 60, 120, 0.6);
+            border: 1.5px solid #2a5aaa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            overflow: hidden;
+            background-size: cover;
+            background-position: center top;
+        }
+
+        .hsr-char-avatar.active .avatar-circle {
+            border-color: #00d4a0;
+            background-color: rgba(0, 160, 120, 0.2);
+            box-shadow: 0 0 12px rgba(0, 212, 160, 0.3);
+        }
+
+        .hsr-char-avatar .avatar-name {
+            font-size: 11px;
+            font-weight: 600;
+            color: #7ab0d8;
+            white-space: nowrap;
+        }
+
+        .hsr-char-avatar.active .avatar-name {
+            color: #00d4a0;
+            font-weight: 700;
+        }
+
+        /* 主内容区 */
+        .hsr-body {
+            padding: 0 16px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* 角色卡片 */
+        .hsr-event-card {
+            display: flex;
+            flex-direction: column;
+            background: rgba(12, 24, 52, 0.7);
+            border: 1px solid #1e4a8a;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .hsr-event-card:hover {
+            border-color: #3a8acc;
+            background: rgba(16, 34, 72, 0.85);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: stretch;
+            min-height: 120px;
+        }
+
+        .hsr-event-num {
+            width: 40px;
+            min-width: 40px;
+            background: rgba(8, 18, 40, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            color: #4ab3e0;
+            border-right: 1px solid #1e4a8a;
+        }
+
+        .hsr-event-num span {
+            font-size: 9px;
+            color: #2a6aaa;
+            letter-spacing: 1px;
+        }
+
+        .hsr-event-img {
+            width: 100px;
+            min-width: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+            flex-shrink: 0;
+            background-size: cover;
+            background-position: center top;
+        }
+
+        .char-avatar {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 42px;
+        }
+
+        .char-avatar.has-image {
+            display: none;
+        }
+
+        .char-rarity {
+            position: absolute;
+            bottom: 4px;
+            right: 4px;
+            font-size: 9px;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            letter-spacing: 1px;
+            padding: 2px 5px;
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.6);
+            color: #f0c040;
+        }
+
+        .hsr-event-info {
+            flex: 1;
+            padding: 10px 12px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .char-name-row {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            margin-bottom: 4px;
+            flex-wrap: wrap;
+        }
+
+        .char-name {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            color: #e8f4ff;
+        }
+
+        .char-title {
+            font-size: 10px;
+            color: #4ab3e0;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .char-tags {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .char-tag {
+            font-size: 9px;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            letter-spacing: 1px;
+            padding: 2px 7px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .tag-path {
+            background: rgba(74, 60, 180, 0.3);
+            color: #a090ff;
+            border: 1px solid rgba(100, 80, 220, 0.4);
+        }
+
+        .char-stats {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            min-width: 60px;
+            flex: 1;
+        }
+
+        .stat-label {
+            font-size: 9px;
+            color: #3a6aaa;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-family: 'Rajdhani', sans-serif;
+            margin-bottom: 2px;
+        }
+
+        .stat-bar-wrap {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .stat-bar {
+            flex: 1;
+            height: 4px;
+            background: rgba(30, 60, 120, 0.5);
+            border-radius: 2px;
+            overflow: hidden;
+            min-width: 40px;
+        }
+
+        .stat-bar-fill {
+            height: 100%;
+            border-radius: 2px;
+        }
+
+        .stat-val {
+            font-size: 10px;
+            font-weight: 700;
+            font-family: 'Rajdhani', sans-serif;
+            color: #a8d0f0;
+            min-width: 20px;
+        }
+
+        .char-desc {
+            font-size: 12px;
+            color: #5a8ab0;
+            line-height: 1.5;
+            padding: 10px 12px;
+            border-top: 1px solid rgba(30, 74, 138, 0.3);
+            background: rgba(8, 18, 40, 0.3);
+        }
+
+        .card-action-btn {
+            display: flex;
+            justify-content: center;
+            padding: 0 12px 12px;
+        }
+
+        .hsr-event-btn {
+            width: 100%;
+            padding: 10px 0;
+            background: linear-gradient(135deg, #e8930a, #d47800);
+            color: #fff;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            font-size: 12px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.16s ease;
+            text-align: center;
+        }
+
+        .hsr-event-btn:hover {
+            background: linear-gradient(135deg, #f9a020, #e88800);
+            transform: scale(1.02);
+            box-shadow: 0 4px 16px rgba(230, 140, 0, 0.35);
+        }
+
+        /* 养成进度卡 */
+        .dev-card-body {
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .dev-card-row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .dev-section-label {
+            font-size: 9px;
+            color: #3a6aaa;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-family: 'Rajdhani', sans-serif;
+            margin-bottom: 4px;
+        }
+
+        .dev-value {
+            font-size: 12px;
+            color: #a8d0f0;
+            font-weight: 600;
+        }
+
+        .eidolon-pips {
+            display: flex;
+            gap: 4px;
+        }
+
+        .eidolon-pip {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            font-weight: 700;
+            font-family: 'Rajdhani', sans-serif;
+        }
+
+        .eidolon-pip.unlocked {
+            border: 1.5px solid #00d4a0;
+            background: rgba(0, 180, 130, 0.25);
+            color: #00d4a0;
+        }
+
+        .eidolon-pip.locked {
+            border: 1.5px solid #1e4a8a;
+            background: rgba(10, 20, 45, 0.6);
+            color: #2a5aaa;
+        }
+
+        .trace-pips {
+            display: flex;
+            gap: 3px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .trace-pip {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+        }
+
+        .trace-pip.unlocked {
+            background: rgba(74, 179, 224, 0.4);
+            border: 1px solid #4ab3e0;
+        }
+
+        .trace-pip.locked {
+            background: rgba(10, 20, 45, 0.6);
+            border: 1px solid #1e4a8a;
+        }
+
+        .trace-count {
+            font-size: 10px;
+            color: #4ab3e0;
+            font-weight: 700;
+            font-family: 'Rajdhani', sans-serif;
+            margin-left: 4px;
+        }
+
+        .prog-bar-wrap {
+            width: 100%;
+        }
+
+        .prog-bar-track {
+            height: 6px;
+            background: rgba(30, 60, 120, 0.4);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .prog-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4a0, #4ab3e0);
+            border-radius: 3px;
+            transition: width 0.6s ease;
+        }
+
+        .prog-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 4px;
+        }
+
+        .prog-label {
+            font-size: 9px;
+            color: #3a6aaa;
+        }
+
+        .prog-label.center {
+            color: #4ab3e0;
+            font-weight: 700;
+        }
+
+        .hsr-footnote {
+            text-align: center;
+            padding: 8px 16px 20px;
+            font-size: 10px;
+            color: #3a6aaa;
+            font-style: italic;
+        }
+
+        /* 小屏优化 */
+        @media (max-width: 360px) {
+            .hsr-event-img {
+                width: 80px;
+                min-width: 80px;
+            }
+
+            .char-name {
+                font-size: 16px;
+            }
+
+            .stat-item {
+                min-width: 50px;
+            }
+
+            .eidolon-pip {
+                width: 20px;
+                height: 20px;
+            }
+        }
+    </style>
+    <base target="_blank">
+    <base target="_blank">
+</head>
+
+<body>
+
+
+    <div class="hsr-wrap">
+        <div class="hsr-header">
+            <div class="hsr-logo-box">
+                <svg viewBox="0 0 36 36" fill="none" width="32" height="32">
+                    <circle cx="18" cy="18" r="14" fill="#0d2a50" stroke="#2a6aaa" stroke-width="1.5" />
+                    <path d="M18 8 L20.5 14 L27 14 L21.5 18 L24 24 L18 20 L12 24 L14.5 18 L9 14 L15.5 14 Z"
+                        fill="#4ab3e0" opacity="0.9" />
+                    <circle cx="18" cy="18" r="3.5" fill="#00e8b0" opacity="0.9" />
+                </svg>
+            </div>
+            <div>
+                <p class="hsr-eyebrow">开拓之旅</p>
+                <h2 class="hsr-main-title">角色图鉴</h2>
+            </div>
+        </div>
+
+        <!-- 横向滚动标签栏 -->
+        <div class="hsr-tabs-row" id="regionTabs">
+            <button class="hsr-tab active" data-region="HUNT" onclick="switchRegion('HUNT', this)">巡猎</button>
+            <button class="hsr-tab" data-region="ERUDITION" onclick="switchRegion('ERUDITION', this)">智识</button>
+            <button class="hsr-tab" data-region="HARMONY" onclick="switchRegion('HARMONY', this)">同谐</button>
+            <button class="hsr-tab" data-region="NIHILITY" onclick="switchRegion('NIHILITY', this)">虚无</button>
+            <button class="hsr-tab" data-region="DESTRUCTION" onclick="switchRegion('DESTRUCTION', this)">毁灭</button>
+        </div>
+
+        <!-- 横向滚动角色头像选择器 -->
+        <div class="hsr-char-selector" id="charSelector"></div>
+
+        <div class="hsr-body">
+            <div class="hsr-events" id="eventList"></div>
+        </div>
+
+        <p class="hsr-footnote">* 角色数据反映当前开拓等级进度</p>
+    </div>
+
+
+    <script>
+        const paths = {
+            HUNT: {
+                label: '巡猎',
+                members: ['希儿', '布洛妮娅', '丹恒', '素裳'],
+                chars: {
+                    '希儿': {
+                        num: '01',
+                        emoji: '🦋',
+                        portrait: '',
+                        thumb: '',
+                        title: '暗夜蝶影',
+                        element: '量子', rarity: '5★',
+                        path: '巡猎', faction: '地火',
+                        stats: [
+                            { l: '攻击', v: 82, c: '#c060ff' },
+                            { l: '速度', v: 95, c: '#4ab3e0' },
+                            { l: '防御', v: 38, c: '#60c0a0' },
+                            { l: '抗性', v: 55, c: '#e08040' }
+                        ],
+                        desc: '地火组织的年轻女性，以迅捷的蝶刃战斗。她的「再现」能力可在击败敌人后再次行动。生于压抑的下层区，她将悲痛化为致命的精准。',
+                        eidolons: 6, traces: 10,
+                        light_cone: '于夜色中'
+                    },
+                    '布洛妮娅': {
+                        num: '02',
+                        emoji: '🐻',
+                        portrait: '',
+                        thumb: '',
+                        title: '凛冬之心',
+                        element: '风', rarity: '5★',
+                        path: '巡猎', faction: '贝洛伯格',
+                        stats: [
+                            { l: '攻击', v: 60, c: '#c060ff' },
+                            { l: '速度', v: 78, c: '#4ab3e0' },
+                            { l: '防御', v: 72, c: '#60c0a0' },
+                            { l: '抗性', v: 80, c: '#e08040' }
+                        ],
+                        desc: '银鬃铁卫的指挥官。布洛妮娅通过推进队友行动和攻击力加成来支援盟友。一个被战争塑造的童兵，如今以冷静的决心肩负贝洛伯格的未来。',
+                        eidolons: 0, traces: 10,
+                        light_cone: '但战斗还未结束'
+                    },
+                    '丹恒': {
+                        num: '03',
+                        emoji: '🐉',
+                        portrait: '',
+                        thumb: '',
+                        title: '流亡之龙',
+                        element: '风', rarity: '4★',
+                        path: '巡猎', faction: '星穹列车',
+                        stats: [
+                            { l: '攻击', v: 75, c: '#c060ff' },
+                            { l: '速度', v: 88, c: '#4ab3e0' },
+                            { l: '防御', v: 48, c: '#60c0a0' },
+                            { l: '抗性', v: 40, c: '#e08040' }
+                        ],
+                        desc: '星穹列车上沉默的档案管理员。他的「风狩」天赋可穿透敌人并降低其速度。一个逃离过往的前罗浮将军，体内封印着龙神之力。',
+                        eidolons: 4, traces: 8,
+                        light_cone: '星海巡航'
+                    },
+                    '素裳': {
+                        num: '04',
+                        emoji: '⚔️',
+                        portrait: '',
+                        thumb: '',
+                        title: '剑少女',
+                        element: '物理', rarity: '4★',
+                        path: '巡猎', faction: '仙舟「罗浮」',
+                        stats: [
+                            { l: '攻击', v: 78, c: '#c060ff' },
+                            { l: '速度', v: 82, c: '#4ab3e0' },
+                            { l: '防御', v: 45, c: '#60c0a0' },
+                            { l: '抗性', v: 35, c: '#e08040' }
+                        ],
+                        desc: '仙舟「罗浮」野心勃勃的女剑客。她的「剑势」可叠加「藏锋」层数。充满活力与天真，她梦想成为传奇的云骑军。',
+                        eidolons: 6, traces: 9,
+                        light_cone: '唯有沉默'
+                    }
+                }
+            },
+
+            ERUDITION: {
+                label: '智识',
+                members: ['姬子', '景元', '黑塔', '希露瓦'],
+                chars: {
+                    '姬子': {
+                        num: '01', emoji: '🔥', portrait: '', thumb: '',
+                        title: '星火漫游者', element: '火', rarity: '5★',
+                        path: '智识', faction: '星穹列车',
+                        stats: [{ l: '攻击', v: 88, c: '#c060ff' }, { l: '速度', v: 70, c: '#4ab3e0' }, { l: '防御', v: 50, c: '#60c0a0' }, { l: '抗性', v: 45, c: '#e08040' }],
+                        desc: '星穹列车的首席工程师兼火焰天才。她的「熔核爆破」在敌人弱点被击破时叠加充能。对星神有着执念，亲手打造了星穹列车。',
+                        eidolons: 4, traces: 10, light_cone: '银河铁道之夜'
+                    },
+                    '景元': {
+                        num: '02', emoji: '⚡', portrait: '', thumb: '',
+                        title: '神策将军', element: '雷', rarity: '5★',
+                        path: '智识', faction: '仙舟「罗浮」',
+                        stats: [{ l: '攻击', v: 85, c: '#c060ff' }, { l: '速度', v: 66, c: '#4ab3e0' }, { l: '防御', v: 58, c: '#60c0a0' }, { l: '抗性', v: 50, c: '#e08040' }],
+                        desc: '罗浮慵懒爱笑的神策将军。他的「神君」召唤物每层「斩」叠加后释放毁灭性的追加攻击。慵懒笑容之下是千年的战争阅历。',
+                        eidolons: 0, traces: 10, light_cone: '拂晓之前'
+                    },
+                    '黑塔': {
+                        num: '03', emoji: '🪆', portrait: '', thumb: '',
+                        title: '冰之傀儡', element: '冰', rarity: '4★',
+                        path: '智识', faction: '星际和平公司',
+                        stats: [{ l: '攻击', v: 72, c: '#c060ff' }, { l: '速度', v: 80, c: '#4ab3e0' }, { l: '防御', v: 40, c: '#60c0a0' }, { l: '抗性', v: 30, c: '#e08040' }],
+                        desc: '天才俱乐部#83号会员，黑塔将意识投射到傀儡躯体中。当敌人生命值低于50%时触发追加攻击。才华横溢、古怪离奇，且对此毫不在意。',
+                        eidolons: 6, traces: 7, light_cone: '天才们的休憩'
+                    },
+                    '希露瓦': {
+                        num: '04', emoji: '🎸', portrait: '', thumb: '',
+                        title: '朗道之选', element: '雷', rarity: '4★',
+                        path: '智识', faction: '贝洛伯格',
+                        stats: [{ l: '攻击', v: 70, c: '#c060ff' }, { l: '速度', v: 74, c: '#4ab3e0' }, { l: '防御', v: 44, c: '#60c0a0' }, { l: '抗性', v: 38, c: '#e08040' }],
+                        desc: '贝洛伯格的摇滚机械师，朗道家族蒙羞的女儿。她的持续伤害随每次攻击敌人而延长。她放弃了贵族前程，选择了吉他弦和沾满油污的手套。',
+                        eidolons: 6, traces: 8, light_cone: '早餐的仪式感'
+                    }
+                }
+            },
+
+            HARMONY: {
+                label: '同谐',
+                members: ['停云', '佩拉', '艾丝妲', '驭空'],
+                chars: {
+                    '停云': {
+                        num: '01', emoji: '🦊', portrait: '', thumb: '',
+                        title: '狐族商人', element: '雷', rarity: '4★',
+                        path: '同谐', faction: '仙舟「罗浮」',
+                        stats: [{ l: '攻击', v: 55, c: '#c060ff' }, { l: '速度', v: 90, c: '#4ab3e0' }, { l: '防御', v: 42, c: '#60c0a0' }, { l: '抗性', v: 70, c: '#e08040' }],
+                        desc: '伶牙俐齿的狐族商人。「赐福」为队友提供攻击力加成并叠加能量。她以狐狸般的机智在政治与商业中游刃有余。',
+                        eidolons: 6, traces: 10, light_cone: '镂月裁云之意'
+                    },
+                    '佩拉': {
+                        num: '02', emoji: '🧊', portrait: '', thumb: '',
+                        title: '晨星', element: '冰', rarity: '4★',
+                        path: '虚无', faction: '贝洛伯格',
+                        stats: [{ l: '攻击', v: 48, c: '#c060ff' }, { l: '速度', v: 82, c: '#4ab3e0' }, { l: '防御', v: 55, c: '#60c0a0' }, { l: '抗性', v: 65, c: '#e08040' }],
+                        desc: '银鬃铁卫的情报官。她的终结技剥离敌人防御并施加「暴露」。冷酷高效的表象之下，是个会给同事偷偷留零食的女孩。',
+                        eidolons: 6, traces: 9, light_cone: '决心如汗珠般闪耀'
+                    },
+                    '艾丝妲': {
+                        num: '03', emoji: '☀️', portrait: '', thumb: '',
+                        title: '星火研究', element: '火', rarity: '4★',
+                        path: '同谐', faction: '星际和平公司',
+                        stats: [{ l: '攻击', v: 52, c: '#c060ff' }, { l: '速度', v: 85, c: '#4ab3e0' }, { l: '防御', v: 60, c: '#60c0a0' }, { l: '抗性', v: 68, c: '#e08040' }],
+                        desc: '充满活力的星际和平公司研究员。「充能」的以太层数提升攻击力，她的终结技为全队加速。文书永远拖延，热情永远超前。',
+                        eidolons: 5, traces: 8, light_cone: '与行星相会'
+                    },
+                    '驭空': {
+                        num: '04', emoji: '🏹', portrait: '', thumb: '',
+                        title: '弓术大师', element: '虚数', rarity: '4★',
+                        path: '同谐', faction: '仙舟「罗浮」',
+                        stats: [{ l: '攻击', v: 58, c: '#c060ff' }, { l: '速度', v: 76, c: '#4ab3e0' }, { l: '防御', v: 50, c: '#60c0a0' }, { l: '抗性', v: 62, c: '#e08040' }],
+                        desc: '天舶司司舵，精通弓术的女将。「鸣弦号令」层数为全队提供攻击力加成。 fiercely protective of the Luofu traditions.',
+                        eidolons: 4, traces: 7, light_cone: '但战斗还未结束'
+                    }
+                }
+            },
+
+            NIHILITY: {
+                label: '虚无',
+                members: ['卡芙卡', '瓦尔特', '桑博', '桂乃芬'],
+                chars: {
+                    '卡芙卡': {
+                        num: '01', emoji: '🌸', portrait: '', thumb: '',
+                        title: '灾厄之蝶', element: '雷', rarity: '5★',
+                        path: '虚无', faction: '星核猎手',
+                        stats: [{ l: '攻击', v: 90, c: '#c060ff' }, { l: '速度', v: 80, c: '#4ab3e0' }, { l: '防御', v: 42, c: '#60c0a0' }, { l: '抗性', v: 60, c: '#e08040' }],
+                        desc: '拥有令人不安的冷静的精英星核猎手。她的被动在所有盟友攻击时触发感电持续伤害。温柔的微笑之下隐藏着曾将整颗星球化为灰烬的掠食者。',
+                        eidolons: 2, traces: 10, light_cone: '只需等待'
+                    },
+                    '瓦尔特': {
+                        num: '02', emoji: '🌀', portrait: '', thumb: '',
+                        title: '旧日君主', element: '虚数', rarity: '5★',
+                        path: '虚无', faction: '星穹列车',
+                        stats: [{ l: '攻击', v: 76, c: '#c060ff' }, { l: '速度', v: 72, c: '#4ab3e0' }, { l: '防御', v: 58, c: '#60c0a0' }, { l: '抗性', v: 55, c: '#e08040' }],
+                        desc: '一个崩溃世界的前君主，如今登上星穹列车。他的虚数之术囚禁敌人，施加「禁锢」。他将整个星球的人民藏在一个小小的装置中随身携带。',
+                        eidolons: 0, traces: 10, light_cone: '以世界之名'
+                    },
+                    '桑博': {
+                        num: '03', emoji: '🗡️', portrait: '', thumb: '',
+                        title: '狡黠恶徒', element: '风', rarity: '4★',
+                        path: '虚无', faction: '雅利洛-VI',
+                        stats: [{ l: '攻击', v: 68, c: '#c060ff' }, { l: '速度', v: 78, c: '#4ab3e0' }, { l: '防御', v: 38, c: '#60c0a0' }, { l: '抗性', v: 48, c: '#e08040' }],
+                        desc: '雅利洛-VI的走私犯和情报贩子。他的「风化」持续伤害可叠加至5层并扩散。为了利益不择手段——却莫名其妙地交到了朋友。',
+                        eidolons: 6, traces: 8, light_cone: '猎物的视线'
+                    },
+                    '桂乃芬': {
+                        num: '04', emoji: '🔮', portrait: '', thumb: '',
+                        title: '炽焰傀儡师', element: '火', rarity: '4★',
+                        path: '虚无', faction: '仙舟「罗浮」',
+                        stats: [{ l: '攻击', v: 65, c: '#c060ff' }, { l: '速度', v: 74, c: '#4ab3e0' }, { l: '防御', v: 44, c: '#60c0a0' }, { l: '抗性', v: 52, c: '#e08040' }],
+                        desc: '罗浮街头的火焰傀儡表演艺人。「火吻」层数在灼烧敌人时扩散至相邻目标。华丽表演之下是一个永远领先三步的头脑。',
+                        eidolons: 6, traces: 7, light_cone: '延长记号'
+                    }
+                }
+            },
+
+            DESTRUCTION: {
+                label: '毁灭',
+                members: ['刃', '克拉拉', '阿兰', '开拓者'],
+                chars: {
+                    '刃': {
+                        num: '01', emoji: '🩸', portrait: '', thumb: '',
+                        title: '毁灭之令使', element: '风', rarity: '5★',
+                        path: '毁灭', faction: '星核猎手',
+                        stats: [{ l: '攻击', v: 72, c: '#c060ff' }, { l: '速度', v: 68, c: '#4ab3e0' }, { l: '防御', v: 35, c: '#60c0a0' }, { l: '抗性', v: 42, c: '#e08040' }],
+                        desc: '寻求死亡的永生剑客。他将生命损失转化为攻击力加成，并从累积伤害中获得追加攻击。数千年自杀未遂使他成为现存最危险的存在。',
+                        eidolons: 2, traces: 10, light_cone: '到不了的彼岸'
+                    },
+                    '克拉拉': {
+                        num: '02', emoji: '🤖', portrait: '', thumb: '',
+                        title: '小傻瓜', element: '物理', rarity: '5★',
+                        path: '毁灭', faction: '雅利洛-VI',
+                        stats: [{ l: '攻击', v: 80, c: '#c060ff' }, { l: '速度', v: 60, c: '#4ab3e0' }, { l: '防御', v: 55, c: '#60c0a0' }, { l: '抗性', v: 35, c: '#e08040' }],
+                        desc: '下层区的孤儿女孩，与古代自动机史瓦罗相伴。史瓦罗会反击任何针对克拉拉的攻击。她看不到怪物——只有被误解的机器和饥饿的人们。',
+                        eidolons: 4, traces: 9, light_cone: '无可取代的东西'
+                    },
+                    '阿兰': {
+                        num: '03', emoji: '⚡', portrait: '', thumb: '',
+                        title: '安保科主任', element: '雷', rarity: '4★',
+                        path: '毁灭', faction: '黑塔空间站',
+                        stats: [{ l: '攻击', v: 82, c: '#c060ff' }, { l: '速度', v: 70, c: '#4ab3e0' }, { l: '防御', v: 30, c: '#60c0a0' }, { l: '抗性', v: 28, c: '#e08040' }],
+                        desc: '黑塔空间站安保科负责人。他的技能消耗生命值而非战技点，将伤痛化为力量。安静而自立，他从不求助，也极少需要帮助。',
+                        eidolons: 6, traces: 7, light_cone: '秘密誓心'
+                    },
+                    '开拓者': {
+                        num: '04', emoji: '🌟', portrait: '', thumb: '',
+                        title: '命运之子', element: '火', rarity: '5★',
+                        path: '毁灭', faction: '星穹列车',
+                        stats: [{ l: '攻击', v: 75, c: '#c060ff' }, { l: '速度', v: 72, c: '#4ab3e0' }, { l: '防御', v: 65, c: '#60c0a0' }, { l: '抗性', v: 50, c: '#e08040' }],
+                        desc: '玩家角色——一位在被劫持的列车上沉睡的年轻开拓者。「炎枪」姿态叠加层数以释放巨额单体伤害。每访问一个世界都在改变着他们。',
+                        eidolons: 6, traces: 10, light_cone: '记一位星神的陨落'
+                    }
+                }
+            }
+        };
+
+        const elemColor = {
+            量子: '#b080ff',
+            风: '#00d4a0',
+            火: '#ff7040',
+            雷: '#a0a0ff',
+            冰: '#60d0ff',
+            物理: '#c0c0c0',
+            虚数: '#f0c040'
+        };
+
+        const gradMap = {
+            量子: '135deg, #2a0a5a, #0a1628',
+            风: '135deg, #0a3a2a, #0a1628',
+            火: '135deg, #5a1a0a, #0a1628',
+            雷: '135deg, #1a1a5a, #0a1628',
+            冰: '135deg, #0a2a4a, #0a1628',
+            物理: '135deg, #2a2a2a, #0a1628',
+            虚数: '135deg, #3a2a0a, #0a1628'
+        };
+
+        let currentRegion = 'HUNT';
+        let currentCountry = '希儿';
+
+        function switchRegion(region, btn) {
+            currentRegion = region;
+            currentCountry = paths[region].members[0];
+
+            document.querySelectorAll('.hsr-tab').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+
+            renderCharSelector();
+            renderEvents();
+        }
+
+        function switchCountry(name) {
+            currentCountry = name;
+            document.querySelectorAll('.hsr-char-avatar').forEach(c => c.classList.remove('active'));
+            const el = document.querySelector(`[data-char="${name}"]`);
+            if (el) el.classList.add('active');
+            renderEvents();
+        }
+
+        function renderCharSelector() {
+            const data = paths[currentRegion];
+            const list = document.getElementById('charSelector');
+
+            list.innerHTML = data.members.map(name => {
+                const char = data.chars[name];
+                const active = name === currentCountry ? ' active' : '';
+
+                let dotStyle = '';
+                let dotInner = `<span style="font-size:18px;">${char.emoji}</span>`;
+
+                if (char.thumb) {
+                    dotStyle = `background-image: url('${char.thumb}'); background-size: cover; background-position: center top;`;
+                    dotInner = '';
+                }
+
+                return `
+      <div class="hsr-char-avatar${active}" data-char="${name.replace(/'/g, "\'")}" onclick="switchCountry('${name.replace(/'/g, "\'")}')">
+        <div class="avatar-circle" style="${dotStyle}">${dotInner}</div>
+        <span class="avatar-name">${name}</span>
+      </div>`;
+            }).join('');
+        }
+
+        function renderEvents() {
+            const char = paths[currentRegion].chars[currentCountry];
+            if (!char) return;
+
+            const ec = elemColor[char.element] || '#4ab3e0';
+            const grad = gradMap[char.element] || '135deg, #1a2a4a, #0a1628';
+            const prog = Math.round((char.eidolons / 6 * 0.5 + char.traces / 10 * 0.5) * 100);
+
+            const portraitBg = char.portrait ? `background-image: url('${char.portrait}');` : '';
+            const avatarHidden = char.portrait ? ' has-image' : '';
+
+            const statsHTML = char.stats.map(s => `
+    <div class="stat-item">
+      <span class="stat-label">${s.l}</span>
+      <div class="stat-bar-wrap">
+        <div class="stat-bar">
+          <div class="stat-bar-fill" style="width:${s.v}%; background:${s.c};"></div>
+        </div>
+        <span class="stat-val">${s.v}</span>
+      </div>
+    </div>`).join('');
+
+            const eidolonPips = [1, 2, 3, 4, 5, 6].map(i => {
+                const cls = i <= char.eidolons ? 'unlocked' : 'locked';
+                return `<div class="eidolon-pip ${cls}">${i}</div>`;
+            }).join('');
+
+            const tracePips = Array.from({ length: 10 }, (_, i) => {
+                const cls = i < char.traces ? 'unlocked' : 'locked';
+                return `<div class="trace-pip ${cls}"></div>`;
+            }).join('');
+
+            document.getElementById('eventList').innerHTML = `
+    <!-- 角色档案卡 -->
+    <div class="hsr-event-card">
+      <div class="card-header">
+        <div class="hsr-event-num">
+          <span>编号</span>${char.num}
+        </div>
+
+        <div class="hsr-event-img"
+             style="background: linear-gradient(${grad}); ${portraitBg}">
+          <div class="char-avatar${avatarHidden}">${char.emoji}</div>
+          <div class="char-rarity">${char.rarity}</div>
+        </div>
+
+        <div class="hsr-event-info">
+          <div class="char-name-row">
+            <p class="char-name">${currentCountry}</p>
+            <span class="char-title">${char.title}</span>
+          </div>
+
+          <div class="char-tags">
+            <span class="char-tag tag-path">${char.path}</span>
+            <span class="char-tag"
+                  style="color:${ec}; border:1px solid ${ec}44; background:${ec}18;">
+              ${char.element}
+            </span>
+            <span class="char-tag"
+                  style="background:rgba(180,120,0,0.25); color:#f0c040; border:1px solid rgba(200,150,0,0.4);">
+              ${char.rarity}
+            </span>
+          </div>
+
+          <div class="char-stats">${statsHTML}</div>
+        </div>
+      </div>
+
+      <p class="char-desc">${char.desc}</p>
+
+      <div class="card-action-btn">
+        <button class="hsr-event-btn">查看档案</button>
+      </div>
+    </div>
+
+    <!-- 养成进度卡 -->
+    <div class="hsr-event-card">
+      <div class="dev-card-body">
+        <div class="dev-card-row">
+
+          <div>
+            <p class="dev-section-label">星魂</p>
+            <div class="eidolon-pips">${eidolonPips}</div>
+          </div>
+
+          <div>
+            <p class="dev-section-label">行迹</p>
+            <div class="trace-pips">
+              ${tracePips}
+              <span class="trace-count">${char.traces}/10</span>
+            </div>
+          </div>
+
+          <div>
+            <p class="dev-section-label">光锥</p>
+            <p class="dev-value">${char.light_cone}</p>
+          </div>
+
+          <div>
+            <p class="dev-section-label">阵营</p>
+            <p class="dev-value">${char.faction}</p>
+          </div>
+
+        </div>
+
+        <div class="prog-bar-wrap">
+          <p class="dev-section-label">总体养成进度</p>
+          <div class="prog-bar-track">
+            <div class="prog-bar-fill" style="width:${prog}%;"></div>
+          </div>
+          <div class="prog-labels">
+            <span class="prog-label">0%</span>
+            <span class="prog-label center">${prog}% 完成</span>
+            <span class="prog-label">100%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-action-btn">
+        <button class="hsr-event-btn">配装指南</button>
+      </div>
+    </div>`;
+        }
+
+        renderCharSelector();
+        renderEvents();
+    </script>
+</body>
+
+</html>

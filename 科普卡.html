@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>违禁品科普卡</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css?family=Indie+Flower');
+        @import url('https://fonts.googleapis.com/css?family=Amatic+SC');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Indie Flower', cursive;
+            background: #FDE3A7;
+            width: 390px;
+            height: 844px;
+            margin: 0 auto;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        ::selection {
+            background: transparent;
+        }
+
+        .card {
+            color: #013243;
+            position: relative;
+            width: 300px;
+            height: 400px;
+            background: #e0e1dc;
+            transform-style: preserve-3d;
+            transform: perspective(2000px);
+            box-shadow: inset 300px 0 50px rgba(0, 0, 0, .5), 20px 0 60px rgba(0, 0, 0, .5);
+            transition: 1s;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .card.open {
+            transform: perspective(2000px) rotate(8deg) scale(1.15);
+            box-shadow: inset 20px 0 50px rgba(0, 0, 0, .5), 0 10px 100px rgba(0, 0, 0, .5);
+        }
+
+        .card:before {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: #BAC1BA;
+            transform-origin: bottom;
+            transform: skewX(-45deg);
+            z-index: 10;
+        }
+
+        .card:after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: -5px;
+            width: 5px;
+            height: 100%;
+            background: #92A29C;
+            transform-origin: left;
+            transform: skewY(-45deg);
+            z-index: 10;
+        }
+
+        .card .imgBox {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-origin: left;
+            transition: .7s;
+            z-index: 2;
+        }
+
+        .card.open .imgBox {
+            transform: rotateY(-135deg);
+        }
+
+        .card .bark {
+            position: absolute;
+            background: #e0e1dc;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: .7s;
+            top: 0;
+            left: 0;
+        }
+
+        .card.open .bark {
+            opacity: 1;
+            transition: .6s;
+            box-shadow: 300px 200px 100px rgba(0, 0, 0, .4) inset;
+        }
+
+        .card .imgBox img {
+            min-width: 250px;
+            max-height: 400px;
+            display: block;
+        }
+
+        .card .details {
+            position: absolute;
+            top: 0;
+            left: 0;
+            padding: 14px 10px 14px 14px;
+            z-index: -1;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .card .details .title-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 3px;
+        }
+
+        .card .details .title-row h4 {
+            font-family: 'Amatic SC', cursive;
+            font-size: 26px;
+            line-height: 1;
+            color: #1BBC9B;
+        }
+
+        .card .details .title-row .badge {
+            font-size: 10px;
+            background: #C0392B;
+            color: #fff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            line-height: 1.3;
+        }
+
+        .card .details .meta {
+            font-size: 10px;
+            color: #666;
+            margin-bottom: 8px;
+            border-bottom: 1px dashed #999;
+            padding-bottom: 5px;
+        }
+
+        .card .details .section {
+            margin-bottom: 5px;
+        }
+
+        .card .details .section-title {
+            font-size: 11px;
+            font-weight: bold;
+            line-height: 1.3;
+            margin-bottom: 1px;
+        }
+
+        .card .details .section p {
+            font-size: 10px;
+            line-height: 1.3;
+            padding-left: 3px;
+        }
+
+        .card .details .tag {
+            margin-top: auto;
+            text-align: right;
+            font-size: 10px;
+            color: #888;
+            padding-top: 3px;
+        }
+
+        .hint {
+            position: absolute;
+            bottom: 60px;
+            width: 100%;
+            text-align: center;
+            color: #C0392B;
+            font-family: 'Amatic SC', cursive;
+            font-size: 18px;
+            opacity: 0.7;
+            animation: pulse 2s infinite;
+            pointer-events: none;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 0.4;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.9;
+                transform: scale(1.05);
+            }
+        }
+    </style>
+    <base target="_blank">
+</head>
+
+<body>
+    <div class="card" id="card">
+        <div class="imgBox">
+            <div class="bark"></div>
+            <img src="https://image.ibb.co/fYzTrb/lastofus.jpg">
+        </div>
+        <div class="details">
+            <div class="title-row">
+                <h4>麝香</h4>
+                <span class="badge">⚠️ 违禁品</span>
+            </div>
+            <div class="meta">分类：濒危物种 | 风险等级：中</div>
+
+            <div class="section">
+                <div class="section-title">📖 科普介绍</div>
+                <p>雄性麝鹿香腺分泌的干燥分泌物。麝鹿分布于中国西藏、四川、云南高山地区。</p>
+            </div>
+
+            <div class="section">
+                <div class="section-title">⚠️ 为何违法</div>
+                <p>麝鹿因盗猎和栖息地丧失濒危。国家一级保护野生动物，CITES附录II。</p>
+            </div>
+
+            <div class="section">
+                <div class="section-title">🔍 走私手法</div>
+                <p>麝香囊干燥后混入香料货物、磨粉隐藏于各种容器。价值与黄金等价。</p>
+            </div>
+
+            <div class="section">
+                <div class="section-title">📊 社会影响</div>
+                <p>全球麝鹿种群较历史下降90%以上。人工合成麝香酮成本远低于天然品。</p>
+            </div>
+
+            <div class="section">
+                <div class="section-title">⚖️ 相关法律</div>
+                <p>违反《野生动物保护法》。使用天然麝香需合法来源证明。</p>
+            </div>
+
+            <div class="section">
+                <div class="section-title">💡 查验技巧</div>
+                <p>暗褐色颗粒状，有强烈持久香气。遇水有发泡现象。</p>
+            </div>
+
+            <div class="tag">缉私科普知识卡</div>
+        </div>
+    </div>
+    <div class="hint">👆 点击卡片翻开</div>
+
+    <script>
+        const card = document.getElementById('card');
+        card.addEventListener('click', function () {
+            this.classList.toggle('open');
+        });
+    </script>
+</body>
+
+</html>

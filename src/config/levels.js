@@ -1,0 +1,87 @@
+var LEVELS = [
+  // == 林锐 · 通关走私识别 ==
+  { id:'k01', name:'审名', tier:'trainee', tutor:'linrui', desc:'伪报品名识别', icon:'📋', time:60, items:5, required:4, scene:'GenericLevelScene', mechanic:'basic', cost:1,
+    hiddenRule:'将高税率商品伪报为低税率品名，HS编码比对可识破伪报' },
+  { id:'k02', name:'核价', tier:'trainee', tutor:'linrui', desc:'伪报价格识别', icon:'💰', time:60, items:5, required:4, scene:'GenericLevelScene', mechanic:'basic', cost:1,
+    hiddenRule:'故意低报进口价格偷逃税款，同类型商品历史价格对比可发现异常' },
+  { id:'k03', name:'点货', tier:'trainee', tutor:'linrui', desc:'伪报数量识别', icon:'📦', time:60, items:5, required:4, scene:'GenericLevelScene', mechanic:'basic', cost:1,
+    hiddenRule:'少报多进或多报少出，货物重量与申报数量不匹配是突破口' },
+  { id:'k04', name:'透影', tier:'duty', tutor:'linrui', desc:'瞒报夹藏识别', icon:'🔍', time:50, items:6, required:5, scene:'RatScene', mechanic:'basic', cost:2,
+    hiddenRule:'在合法货物中隐藏走私品，X光扫描显示异常阴影' },
+  { id:'k05', name:'探构', tier:'duty', tutor:'linrui', desc:'运输工具暗格', icon:'🚛', time:50, items:6, required:5, scene:'RatScene', mechanic:'basic', cost:2,
+    hiddenRule:'车辆船舶设置暗格夹层，改装痕迹和重量分布异常是识别关键' },
+  { id:'k06', name:'搜身', tier:'special', tutor:'linrui', desc:'人体藏匿识别', icon:'👤', time:40, items:7, required:5, scene:'RatScene', mechanic:'basic', cost:3,
+    hiddenRule:'将货物绑在身上或藏在体内，体态异常和频繁出入境是预警信号' },
+
+  // == 陈锋 · 毒品走私识别 ==
+  { id:'k07', name:'搜隐', tier:'trainee', tutor:'chenfeng', desc:'人体藏毒识别', icon:'💊', time:60, items:5, required:4, scene:'SnakeScene', mechanic:'risk', cost:1,
+    hiddenRule:'吞服毒品胶囊或塞入体内，腹部异常肿胀和长时间不进食是特征' },
+  { id:'k08', name:'验囊', tier:'trainee', tutor:'chenfeng', desc:'行李夹藏毒品', icon:'🧳', time:60, items:5, required:4, scene:'SnakeScene', mechanic:'risk', cost:1,
+    hiddenRule:'裙子藏毒1843克、纽扣藏毒数千克，物品重量异常是最大破绽' },
+  { id:'k09', name:'破藏', tier:'trainee', tutor:'chenfeng', desc:'货物夹藏毒品', icon:'📦', time:60, items:5, required:4, scene:'SnakeScene', mechanic:'risk', cost:1,
+    hiddenRule:'净水器藏毒988克、轴承藏毒2240克，注意货物结构异常' },
+  { id:'k10', name:'截邮', tier:'duty', tutor:'chenfeng', desc:'邮寄伪报毒品', icon:'✉️', time:50, items:6, required:5, scene:'SnakeScene', mechanic:'risk', cost:2,
+    hiddenRule:'"茶叶"包裹藏冰毒、"保健品"藏海洛因，寄件人信息可疑是关键' },
+  { id:'k11', name:'嗅锋', tier:'duty', tutor:'chenfeng', desc:'气味掩盖识别', icon:'👃', time:50, items:6, required:5, scene:'SnakeScene', mechanic:'risk', cost:2,
+    hiddenRule:'用辣椒粉等刺激性气味掩盖毒品，缉毒犬反应异常是预警' },
+  { id:'k12', name:'鉴新', tier:'special', tutor:'chenfeng', desc:'新型毒品识别', icon:'🧪', time:40, items:7, required:5, scene:'SnakeScene', mechanic:'risk', cost:3,
+    hiddenRule:'新精神活性物质伪装成保健品，宣称"无害""合法"是典型特征' },
+
+  // == 赵海 · 海上绕关走私 ==
+  { id:'k13', name:'截浪', tier:'trainee', tutor:'zhaohai', desc:'海上接驳识别', icon:'🌊', time:60, items:5, required:4, scene:'GenericLevelScene', mechanic:'basic', cost:1,
+    hiddenRule:'走私船舶在海上预定地点接驳，夜间异常活动和无线电静默是信号' },
+  { id:'k14', name:'锁滩', tier:'trainee', tutor:'zhaohai', desc:'靠岸偷卸识别', icon:'🏖️', time:60, items:5, required:4, scene:'GenericLevelScene', mechanic:'basic', cost:1,
+    hiddenRule:'从未设关码头偷运上岸，偏远海岸异常车辆聚集是线索' },
+  { id:'k15', name:'封径', tier:'trainee', tutor:'zhaohai', desc:'边境小道识别', icon:'🛤️', time:60, items:5, required:4, scene:'GenericLevelScene', mechanic:'basic', cost:1,
+    hiddenRule:'利用陆路边境非设关地偷运，异常足迹车辙和夜间活动是预警' },
+  { id:'k16', name:'堵频', tier:'duty', tutor:'zhaohai', desc:'蚂蚁搬家识别', icon:'🐜', time:50, items:6, required:5, scene:'GenericLevelScene', mechanic:'basic', cost:2,
+    hiddenRule:'水客多次往返携带，同一人员频繁出入境是典型特征' },
+  { id:'k17', name:'验舱', tier:'duty', tutor:'zhaohai', desc:'改装船舶识别', icon:'⛵', time:50, items:6, required:5, scene:'GenericLevelScene', mechanic:'basic', cost:2,
+    hiddenRule:'双层底油轮、舱中暗格货船，吃水线与载货不符是识别关键' },
+  { id:'k18', name:'慧眼', tier:'special', tutor:'zhaohai', desc:'科技缉私手段', icon:'🛰️', time:40, items:7, required:5, scene:'GenericLevelScene', mechanic:'basic', cost:3,
+    hiddenRule:'查船机器人监管半径25km，卫星遥感可全球定位可疑船舶' },
+
+  // == 白薇 · 冻品防疫走私 ==
+  { id:'k19', name:'冻察', tier:'trainee', tutor:'baiwei', desc:'冻品绕关识别', icon:'❄️', time:60, items:5, required:4, scene:'GenericLevelScene', mechanic:'basic', cost:1,
+    hiddenRule:'从非设关地走私未经检疫冷冻肉，无中文标签和检疫证明是破绽' },
+  { id:'k20', name:'冷辨', tier:'trainee', tutor:'baiwei', desc:'冻品伪报识别', icon:'🥩', time:60, items:5, required:4, scene:'GenericLevelScene', mechanic:'basic', cost:1,
+    hiddenRule:'冻牛肉伪报为冷冻食品，包装与品名不符是识别关键' },
+  { id:'k21', name:'冰鉴', tier:'trainee', tutor:'baiwei', desc:'冻品夹藏识别', icon:'🧊', time:60, items:5, required:4, scene:'GenericLevelScene', mechanic:'basic', cost:1,
+    hiddenRule:'走私冻品混在合法进口冻品中，温度记录异常是突破口' },
+  { id:'k22', name:'链控', tier:'duty', tutor:'baiwei', desc:'冷链监控手段', icon:'📡', time:50, items:6, required:5, scene:'GenericLevelScene', mechanic:'basic', cost:2,
+    hiddenRule:'GPS追踪+温度记录+电子锁，全程监控冷链物流可防走私' },
+  { id:'k23', name:'御瘟', tier:'duty', tutor:'baiwei', desc:'疫病传播防控', icon:'🦠', time:50, items:6, required:5, scene:'GenericLevelScene', mechanic:'basic', cost:2,
+    hiddenRule:'非洲猪瘟通过走私猪肉传入，来源国禁令和核酸检测是防线' },
+  { id:'k24', name:'安境', tier:'special', tutor:'baiwei', desc:'国门生物安全', icon:'🌿', time:40, items:7, required:5, scene:'GenericLevelScene', mechanic:'basic', cost:3,
+    hiddenRule:'外来入侵物种超660种，口岸检疫是第一道防线' },
+
+  // == 老周 · 加工贸易走私 ==
+  { id:'k25', name:'追料', tier:'trainee', tutor:'laozhou', desc:'飞料走私识别', icon:'🧵', time:60, items:5, required:4, scene:'GenericLevelScene', mechanic:'basic', cost:1,
+    hiddenRule:'保税料件进口后不加工直接内销，企业用电量与产能不匹配是线索' },
+  { id:'k26', name:'核单', tier:'trainee', tutor:'laozhou', desc:'骗取核销识别', icon:'📄', time:60, items:5, required:4, scene:'GenericLevelScene', mechanic:'basic', cost:1,
+    hiddenRule:'虚报出口数量骗取海关核销，出口货物无实际离境记录是关键' },
+  { id:'k27', name:'辨材', tier:'trainee', tutor:'laozhou', desc:'串换料件识别', icon:'🔬', time:60, items:5, required:4, scene:'GenericLevelScene', mechanic:'basic', cost:1,
+    hiddenRule:'用国产料件替换进口保税料件，产品质量与进口料件不符是破绽' },
+  { id:'k28', name:'验转', tier:'duty', tutor:'laozhou', desc:'假结转识别', icon:'🔄', time:50, items:6, required:5, scene:'GenericLevelScene', mechanic:'basic', cost:2,
+    hiddenRule:'虚假深加工结转，结转货物无实际物流记录是突破口' },
+  { id:'k29', name:'查免', tier:'duty', tutor:'laozhou', desc:'倒卖减免税识别', icon:'🏷️', time:50, items:6, required:5, scene:'GenericLevelScene', mechanic:'basic', cost:2,
+    hiddenRule:'减免税设备倒卖给无资格企业，设备出现在非申请企业是线索' },
+  { id:'k30', name:'破包', tier:'special', tutor:'laozhou', desc:'假合作包税识别', icon:'👜', time:40, items:7, required:5, scene:'GenericLevelScene', mechanic:'basic', cost:3,
+    hiddenRule:'借用有资格企业名义进口，"包税"费用明显低于正常税费是关键' },
+
+  // == 小辉 · 综合与纪念 ==
+  { id:'k31', name:'护珍', tier:'trainee', tutor:'xiaohui', desc:'珍贵动物制品', icon:'🐘', time:60, items:5, required:4, scene:'TigerScene', mechanic:'magnifier', cost:1,
+    hiddenRule:'象牙交叉纹路（施雷格线）是鉴别关键，穿山甲鳞片有同心圆纹路' },
+  { id:'k32', name:'鉴电', tier:'trainee', tutor:'xiaohui', desc:'电子产品走私', icon:'📱', time:60, items:5, required:4, scene:'GenericLevelScene', mechanic:'basic', cost:1,
+    hiddenRule:'iPhone伪报为手机配件，无3C认证标志和价格异常是破绽' },
+  { id:'k33', name:'清源', tier:'trainee', tutor:'xiaohui', desc:'洋垃圾走私识别', icon:'♻️', time:60, items:5, required:4, scene:'GenericLevelScene', mechanic:'basic', cost:1,
+    hiddenRule:'医疗废物伪报为废塑料，恶臭和污染是明显特征' },
+  { id:'k34', name:'斩链', tier:'duty', tutor:'xiaohui', desc:'全链条打击', icon:'⚔️', time:50, items:6, required:5, scene:'GenericLevelScene', mechanic:'basic', cost:2,
+    hiddenRule:'从走私到销售全环节打击，摧毁案值4.7亿元走私团伙' },
+  { id:'k35', name:'盟缉', tier:'duty', tutor:'xiaohui', desc:'国际协作缉私', icon:'🤝', time:50, items:6, required:5, scene:'GenericLevelScene', mechanic:'basic', cost:2,
+    hiddenRule:'与境外海关情报交换和联合行动，跨国走私查获率提升30%' },
+  { id:'k36', name:'安归', tier:'special', tutor:'xiaohui', desc:'缉私精神传承', icon:'🌟', time:40, items:7, required:5, scene:'TigerScene', mechanic:'magnifier', cost:3,
+    hiddenRule:'忠诚勇敢智慧奉献，从望远镜到查船机器人，变的是科技不变的是精神' }
+];
+
+var LEVEL_CONFIG = { all: LEVELS };
