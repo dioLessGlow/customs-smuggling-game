@@ -1,8 +1,10 @@
 var _mapRoot = null;
 var _tutorFilter = 'all';
 var _isGlobe = true;
+var _entering = false;
 
 function _startLevel(levelId) {
+  if (_entering) return;
   var cfg = LEVELS.find(function(l) { return l.id === levelId; });
   if (!cfg) return;
   var save = SaveManager.load();
@@ -10,13 +12,28 @@ function _startLevel(levelId) {
   var completed = save.completed.indexOf(levelId) >= 0;
   var canAfford = save.permanentDao >= cfg.cost;
   if (!unlocked) return;
-  if (completed || !canAfford) return;
+  if (completed) { alert('该关卡已通过'); return; }
+  if (!canAfford) {
+    var today = new Date().toDateString();
+    if (save.guaranteeDate !== today) { save.guaranteeDaily = 3; save.guaranteeDate = today; }
+    if (save.guaranteeDaily > 0) {
+      save.guaranteeDaily--;
+      save.permanentDao += 3;
+      SaveManager.save(save);
+      alert('送你3点功勋！保底剩余 ' + save.guaranteeDaily + '/3');
+    } else {
+      alert('功勋不足，今日保底次数已用完');
+      return;
+    }
+  }
+  _entering = true;
   soundManager.play('click');
   save.permanentDao -= cfg.cost;
   SaveManager.save(save);
   UI.hide();
   document.getElementById('phaser-container').style.display = 'block';
   game.scene.start(cfg.scene, { levelId: levelId });
+  setTimeout(function() { _entering = false; }, 2000);
 }
 
 function _getLevelState(levelId) {
@@ -54,6 +71,20 @@ UI.on('level-select', function () {
     })(ids[i]);
     filterBar.appendChild(btn);
   }
+
+  // daily guarantee indicator
+  var save = SaveManager.load();
+  var daoInfo = document.getElementById('dao-info');
+  if (!daoInfo) {
+    daoInfo = document.createElement('div');
+    daoInfo.id = 'dao-info';
+    daoInfo.style.cssText = 'text-align:center;font-size:10px;color:#8b5e3c;padding:2px 0 0 0;';
+    filterBar.parentNode.insertBefore(daoInfo, filterBar.nextSibling);
+  }
+  var today = new Date().toDateString();
+  var gDaily = (save.guaranteeDate === today) ? save.guaranteeDaily : 3;
+  var isOnGuarantee = save.permanentDao === 0 && gDaily > 0;
+  daoInfo.innerHTML = '⚡ 功勋 ' + save.permanentDao + ' <span style="color:' + (isOnGuarantee ? '#e74c3c;font-weight:600' : '#8b5e3c') + '">| 保底 ' + gDaily + '/3</span>';
 
   if (typeof am5 === 'undefined') return;
 

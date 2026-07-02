@@ -52,12 +52,37 @@ game.scene.add('TigerScene', TigerScene, false);
 game.scene.add('SnakeScene', SnakeScene, false);
 window.game = game;
 
-function tideLoop() { TidesBg.update(); requestAnimationFrame(tideLoop); }
+function tideLoop() {
+  TidesBg.update();
+  var app = document.getElementById('app');
+  var luma = TidesBg.getCurrentLuminance();
+  app.classList.toggle('bg-light', luma > 0.5);
+  var txt = TidesBg.getTextColors();
+  app.style.setProperty('--txt-primary', txt.primary);
+  app.style.setProperty('--txt-secondary', txt.secondary);
+  app.style.setProperty('--txt-shadow', txt.shadow);
+  requestAnimationFrame(tideLoop);
+}
 tideLoop();
 
 fitApp();
 window.addEventListener('resize', function () { setTimeout(fitApp, 200); });
 SaveManager.checkDailyLogin();
+
+// 自动保存
+function _doAutoSave() {
+  try {
+    var s = SaveManager.load();
+    if (s && s.settings && s.settings.auto_save !== false) {
+      SaveManager.save(s);
+    }
+  } catch(e) {}
+}
+setInterval(_doAutoSave, 30000);
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) _doAutoSave();
+});
+window.addEventListener('beforeunload', _doAutoSave);
 
 var saved = null;
 try { saved = sessionStorage.getItem('ui_screen'); } catch (e) {}

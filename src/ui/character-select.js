@@ -10,10 +10,10 @@ function renderSelector(save, currentId) {
   el.innerHTML = TUTOR_POOL.map(function (t) {
     var aff = save.tutorAffinity[t.id] || 0;
     var active = t.id === currentId ? ' active' : '';
+    var cname = save.tutorNames && save.tutorNames[t.id] || t.name;
     return '<div class="cs-avatar' + active + '" data-cs="' + t.id + '">' +
       '<div class="cs-avatar-circle">' + t.icon + '</div>' +
-      '<span class="cs-avatar-name">' + t.name + '</span>' +
-      '<span style="font-size:7px;color:#94a3b8;margin-top:1px;">' + aff + '</span>' +
+      '<span class="cs-avatar-name">' + cname + '</span>' +
     '</div>';
   }).join('');
   el.onclick = function (e) {
@@ -32,6 +32,7 @@ function renderCards(save, tutorId) {
   if (!tutor) return;
 
   var aff = save.tutorAffinity[tutorId] || 0;
+  var customName = save.tutorNames && save.tutorNames[tutorId];
 
   var td = TUTOR_META[tutorId] || { age:'-', years:null, title:tutor.role, field:'缉私', trait:'-', quote:'-', story:tutor.role + '是一名缉私人员。' };
 
@@ -64,8 +65,9 @@ function renderCards(save, tutorId) {
       '</div>' +
       '<div class="cs-card-info">' +
         '<div class="cs-name-row">' +
-          '<span class="cs-name">' + tutor.name + '</span>' +
+          '<span class="cs-name" id="cs-display-name">' + (customName || tutor.name) + '</span>' +
           '<span class="cs-title-tag">' + td.title + '</span>' +
+          '<span id="cs-rename-btn" style="font-size:10px;color:#c4a882;cursor:pointer;margin-left:auto;flex-shrink:0;padding:0 4px;">✏️</span>' +
         '</div>' +
         '<div class="cs-tags">' +
           '<span class="cs-tag cs-tag-field">' + td.field + '</span>' +
@@ -105,7 +107,7 @@ function renderCards(save, tutorId) {
         '<div class="cs-prog-labels"><span class="cs-prog-label">0%</span><span class="cs-prog-label center">' + progPct + '%</span><span class="cs-prog-label">100%</span></div>' +
       '</div>' +
     '</div>' +
-    '<div class="cs-action"><button class="cs-btn" id="cs-select-btn" style="background:linear-gradient(135deg,#00a87a,#008b5e);margin-bottom:6px;">✅ 选择</button><button class="cs-btn" id="cs-quiz-btn">📝 开始测验</button></div>';
+    '<div class="cs-action"><button class="cs-btn" id="cs-select-btn" style="margin-bottom:6px;">✅ 选择</button><button class="cs-btn" id="cs-quiz-btn">📝 开始测验</button></div>';
 
   document.getElementById('cs-select-btn').onclick = function () {
     var sv = SaveManager.load();
@@ -117,6 +119,20 @@ function renderCards(save, tutorId) {
   document.getElementById('cs-quiz-btn').onclick = function () {
     soundManager.play('click');
     _startTutorQuiz(tutorId);
+  };
+
+  document.getElementById('cs-rename-btn').onclick = function () {
+    var newName = prompt('请输入新的名字（留空恢复默认）:', customName || tutor.name);
+    if (newName === null) return;
+    var sv = SaveManager.load();
+    if (!sv.tutorNames) sv.tutorNames = {};
+    if (newName.trim() && newName.trim() !== tutor.name) {
+      sv.tutorNames[tutorId] = newName.trim();
+    } else {
+      delete sv.tutorNames[tutorId];
+    }
+    SaveManager.save(sv);
+    UI.show('character-select');
   };
 
   requestAnimationFrame(function () {

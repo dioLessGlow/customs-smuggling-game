@@ -87,6 +87,7 @@ class GenericLevelScene extends Phaser.Scene {
     this.ownedIntuitions = [];
     this.save = SaveManager.load();
     this._applyShopEffects();
+    this.maxTime = this.timeLimit;
   }
 
   _applyShopEffects() {
@@ -454,9 +455,11 @@ class GenericLevelScene extends Phaser.Scene {
     this._createScanArea();
     this._createButtons();
     this._createEchoIndicator();
+    this._createHourglass();
 
     this.time.delayedCall(1500, () => {
       this._showItem();
+      this._seekAnim(1);
       this.timeEvent = this.time.addEvent({
         delay: 1000, callback: this._onTick, callbackScope: this, loop: true
       });
@@ -502,24 +505,24 @@ class GenericLevelScene extends Phaser.Scene {
       fontSize: '18px', color: '#ffd700', fontFamily: 'Arial Black, sans-serif'
     }).setOrigin(0.5);
     this.add.text(width / 2, 50, this.config.desc, {
-      fontSize: '11px', color: '#94a3b8'
+      fontSize: '11px', color: '#e2e8f0'
     }).setOrigin(0.5);
 
-    this.timeText = this.add.text(20, 72, '⏱ ' + this.timeLimit, {
-      fontSize: '16px', color: '#ffffff', fontFamily: 'monospace'
+    this.timeText = this.add.text(55, 72, String(this.timeLimit), {
+      fontSize: '16px', color: '#ffffff', fontFamily: 'monospace', fontStyle: 'bold'
     });
 
     this.progressText = this.add.text(width - 20, 72, '📦 0/' + this.itemsPerWave, {
-      fontSize: '14px', color: '#94a3b8'
+      fontSize: '14px', color: '#e2e8f0'
     }).setOrigin(1, 0);
 
     this.comboText = this.add.text(width / 2, 72, '', {
       fontSize: '13px', color: '#ffd700', fontFamily: 'Arial Black, sans-serif'
     }).setOrigin(0.5, 0);
 
-    this.protectText = this.add.text(20, 92, '', {
+    this.protectText = this.add.text(780, 92, '', {
       fontSize: '11px', color: '#00e5ff', fontFamily: 'monospace'
-    });
+    }).setOrigin(1, 0);
 
     this.scoreText = this.add.text(width / 2, 92, '', {
       fontSize: '13px', color: '#ffd700', fontFamily: 'monospace'
@@ -527,9 +530,9 @@ class GenericLevelScene extends Phaser.Scene {
     this._updateScoreDisplay();
 
     // Settings button (top-right corner)
-    this.settingsBtn = this.add.text(width - 8, 8, '⚙️', {
+    this.settingsBtn = this.add.text(8, 30, '⚙️', {
       fontSize: '18px'
-    }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
+    }).setOrigin(0, 0).setInteractive({ useHandCursor: true });
     this.settingsBtn.on('pointerdown', () => this._togglePause());
   }
 
@@ -539,8 +542,7 @@ class GenericLevelScene extends Phaser.Scene {
     var el = document.getElementById('game-pause');
     if (this.paused) {
       if (this.timeEvent) this.timeEvent.paused = true;
-      this.timeText.setText('⏸️ 暂停');
-      this.timeText.setColor('#00e5ff');
+      this._updateHourglass(this.timeLimit / this.maxTime);
       // Init toggle state
       var save = SaveManager.load();
       var bg = document.querySelector('#pause-toggle-sound .toggle-bg');
@@ -585,7 +587,7 @@ class GenericLevelScene extends Phaser.Scene {
       el.style.display = 'flex';
     } else {
       if (this.timeEvent) this.timeEvent.paused = false;
-      this.timeText.setColor('#ffffff');
+      this._updateHourglass(this.timeLimit / this.maxTime);
       el.style.display = 'none';
     }
   }
@@ -678,6 +680,72 @@ class GenericLevelScene extends Phaser.Scene {
   _createEchoIndicator() {
     const { width } = this.scale;
     this.echoIndicator = new EchoIndicator(this, width / 2, 115);
+  }
+
+  _createHourglass() {
+    if (!document.getElementById('hg-style')) {
+      var s = document.createElement('style');
+      s.id = 'hg-style';
+      s.textContent =
+        '@keyframes hg-shrink{0%{transform:scale(1)}99%{transform:scale(0)}100%{transform:scale(0)}}' +
+        '@keyframes hg-grow{0%{transform:scale(0)}99%{transform:scale(1)}100%{transform:scale(1)}}' +
+        '@keyframes hg-line{0%{height:0}99%{height:20px}100%{height:20px}}' +
+        '@keyframes hg-rotate{0%{transform:rotate(0deg)}99%{transform:rotate(0deg)}100%{transform:rotate(180deg)}}';
+      document.head.appendChild(s);
+    }
+    var old = document.getElementById('hg-box');
+    if (old) old.remove();
+    this._hgCycle = 30;
+    var wrap = document.createElement('div');
+    wrap.id = 'hg-box';
+    wrap.style.cssText = 'position:absolute;left:18px;top:59px;z-index:50;pointer-events:none;';
+    var dur = '30s';
+    var glassBg = 'rgba(196,168,130,0.18)';
+    var sandColor = '#c4a882';
+    var frameColor = '#8b5e3c';
+    wrap.innerHTML =
+      '<div id="hg-inner" style="position:relative;width:30px;height:40px;animation:hg-rotate 30s linear infinite">' +
+        '<div style="position:absolute;top:0;left:0;width:30px;height:2px;border-radius:1px;background:' + frameColor + ';pointer-events:none"></div>' +
+        '<div style="position:absolute;top:38px;left:0;width:30px;height:2px;border-radius:1px;background:' + frameColor + ';pointer-events:none"></div>' +
+        '<div style="position:absolute;top:2px;left:0;width:1px;height:0;border-left:15px solid transparent;border-right:15px solid transparent;border-top:18px solid ' + glassBg + ';pointer-events:none"></div>' +
+        '<div style="position:absolute;top:20px;left:0;width:1px;height:0;border-left:15px solid transparent;border-right:15px solid transparent;border-bottom:18px solid ' + glassBg + ';pointer-events:none"></div>' +
+        '<div id="hg-top" style="position:absolute;top:2px;left:0;width:1px;height:0;border-left:15px solid transparent;border-right:15px solid transparent;border-top:18px solid ' + sandColor + ';transform-origin:50% 100%;animation:hg-shrink 30s linear infinite"></div>' +
+        '<div id="hg-bot" style="position:absolute;top:20px;left:0;width:1px;height:0;border-left:15px solid transparent;border-right:15px solid transparent;border-bottom:18px solid ' + sandColor + ';transform-origin:50% 100%;animation:hg-grow 30s linear infinite"></div>' +
+        '<div id="hg-line" style="position:absolute;top:20px;left:14px;width:0;height:0;border-left:1px dotted ' + sandColor + ';animation:hg-line 30s linear infinite"></div>' +
+      '</div>';
+    document.getElementById('phaser-container').appendChild(wrap);
+    this._hgBox = wrap;
+    this._hgInner = wrap.querySelector('#hg-inner');
+    this._hgTop = wrap.querySelector('#hg-top');
+    this._hgBot = wrap.querySelector('#hg-bot');
+    this._hgLine = wrap.querySelector('#hg-line');
+  }
+
+  _updateHourglass(ratio) {
+    if (!this._hgTop) return;
+    if (this.timeLimit <= 3 && !this.paused) {
+      this._hgInner.style.animation = 'none';
+      this._hgInner.style.transform = 'rotate(0deg)';
+    }
+    var c = '#c4a882';
+    this._hgTop.style.borderTopColor = c;
+    this._hgBot.style.borderBottomColor = c;
+    this._hgLine.style.borderLeftColor = c;
+    [this._hgTop, this._hgBot, this._hgLine, this._hgInner].forEach(function(el) {
+      el.getAnimations().forEach(function(a) {
+        if (this.paused) a.pause();
+        else if (a.playState === 'paused') a.play();
+      }, this);
+    }, this);
+  }
+
+  _seekAnim(ratio) {
+    if (!this._hgTop) return;
+    var elapsed = (1 - ratio) * this.maxTime * 1000;
+    var cyclePos = elapsed % (this._hgCycle * 1000);
+    [this._hgTop, this._hgBot, this._hgLine, this._hgInner].forEach(function(el) {
+      el.getAnimations().forEach(function(a) { a.currentTime = Math.min(cyclePos, this._hgCycle * 1000); }, this);
+    }, this);
   }
 
   _setButtonsEnabled(enabled) {
@@ -850,7 +918,9 @@ class GenericLevelScene extends Phaser.Scene {
       inspectText.destroy();
       this.timeLimit -= 3;
       if (this.timeLimit < 0) this.timeLimit = 0;
-      this.timeText.setText('⏱ ' + this.timeLimit);
+      this.timeText.setText(String(this.timeLimit));
+      this._updateHourglass(this.timeLimit / this.maxTime);
+      this._seekAnim(this.timeLimit / this.maxTime);
       if (this.timeLimit <= 10) this.timeText.setColor('#ff4444');
 
       const concealTips = {
@@ -917,7 +987,7 @@ class GenericLevelScene extends Phaser.Scene {
         this.comboText.setText('🔥 ' + this.combo + '连击');
         if (this.combo === 3 && !this.comboProtected) {
           this.comboProtected = true;
-          this.time.delayedCall(300, () => new PopupText(this, cx, cy - 70, '🔮 缉私直觉', '#00e5ff', 16));
+          this.time.delayedCall(300, () => new PopupText(this, this.scale.width - 80, cy - 70, '🔮 缉私直觉', '#00e5ff', 16));
         }
         if (this.save.echoSkills.length > 0) {
           this.time.delayedCall(500, () => this._triggerEcho());
@@ -970,7 +1040,7 @@ class GenericLevelScene extends Phaser.Scene {
       if (this.comboProtected) {
         this.comboProtected = false;
         actualPenalty = 0;
-        new PopupText(this, cx, cy - 40, '🔮 直觉抵挡', '#00e5ff', 16);
+        new PopupText(this, this.scale.width - 80, cy - 40, '🔮 直觉抵挡', '#00e5ff', 16);
       } else if (!keepCombo) {
         this.combo = 0;
       }
@@ -979,11 +1049,11 @@ class GenericLevelScene extends Phaser.Scene {
       this.wrongCount++;
 
       if (item.risk) {
-        soundManager.play('alarm');
+        soundManager.play('alarm'); soundManager.vibrate(100);
         this.cameras.main.shake(300, 0.015);
         new PopupText(this, cx, cy - 40, '-' + actualPenalty + ' 🚨 毒品!', '#ff0000', 36);
       } else {
-        soundManager.play('wrong');
+        soundManager.play('wrong'); soundManager.vibrate(50);
         new PopupText(this, cx, cy - 40, actualPenalty > 0 ? '-' + actualPenalty : '免罚', '#ff4444');
         this.cameras.main.shake(200, 0.01);
       }
@@ -1130,7 +1200,7 @@ class GenericLevelScene extends Phaser.Scene {
   _triggerFalseAlarm() {
     if (this.isEnding) return;
     this._alarmActive = true;
-    soundManager.play('alarm');
+    soundManager.play('alarm'); soundManager.vibrate(80);
     this.cameras.main.shake(200, 0.008);
     this._setButtonsEnabled(false);
 
@@ -1163,10 +1233,12 @@ class GenericLevelScene extends Phaser.Scene {
     if (this.paused) {
       this.timeText.setText('⏸️ 暂停');
       this.timeText.setColor('#00e5ff');
+      this._updateHourglass(this.timeLimit / this.maxTime);
       return;
     }
     this.timeLimit--;
-    this.timeText.setText('⏱ ' + this.timeLimit);
+    this.timeText.setText(String(this.timeLimit));
+    this._updateHourglass(this.timeLimit / this.maxTime);
     if (this.timeLimit <= 10) this.timeText.setColor('#ff4444');
     // wind warning: auto-highlight illegal items in last 5s
     if (this.timeLimit <= 5 && this.timeLimit > 0 && this.ownedIntuitions.indexOf('wind_warning') >= 0) {
@@ -1184,6 +1256,7 @@ class GenericLevelScene extends Phaser.Scene {
         this.paused = true;
         this.timeText.setText('⏸️ 暂停 5秒');
         this.timeText.setColor('#00e5ff');
+        this._updateHourglass(this.timeLimit / this.maxTime);
         new PopupText(this, this.scale.width / 2, this.scale.height / 2 - 40, '⏳ 时间掌控', '#ea80fc', 18);
         this.time.delayedCall(5000, () => { if (!this.isEnding) { this.paused = false; this.timeLimit++; this._onTick(); } });
       } else {

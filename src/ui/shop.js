@@ -1,6 +1,16 @@
 var _shopCurrentTab = 'equipment';
 var _shopPendingItem = null;
 var _shopCurrentTutor = null;
+var _shopCurrentFloor = 1;
+var _shopIsMoving = false;
+
+var _floorMap = {
+  '1': { tab: 'shop', label: '我的小店', icon: '🏪' },
+  '2': { tab: 'equipment', label: '装备库', icon: '🔧' },
+  '3': { tab: 'skills', label: '训练室', icon: '💪' },
+  '4': { tab: 'intuitions', label: '灵感室', icon: '🧠' },
+  '5': { tab: 'knowledge', label: '知识殿堂', icon: '📚' }
+};
 
 function _shopCardState(item, tab, save) {
   var owned = tab === 'knowledge' ? save.shopKnowledge.indexOf(item.id) >= 0 : save.shopItems.indexOf(item.id) >= 0;
@@ -46,7 +56,6 @@ function _showUpgradeModal(item, tab, save) {
   document.getElementById('su-icon').textContent = item.icon;
   document.getElementById('su-name').textContent = item.name;
 
-  // Current column
   if (prevItem && ownedPrev) {
     document.getElementById('su-current-name').textContent = prevItem.name;
     document.getElementById('su-current-desc').textContent = prevItem.desc;
@@ -61,7 +70,6 @@ function _showUpgradeModal(item, tab, save) {
     document.getElementById('su-current-desc').textContent = '未拥有';
   }
 
-  // Next column
   if (ownedCur && nextItem) {
     document.getElementById('su-next-name').textContent = nextItem.name;
     document.getElementById('su-next-desc').textContent = nextItem.desc;
@@ -74,7 +82,6 @@ function _showUpgradeModal(item, tab, save) {
     document.getElementById('su-next-desc').textContent = item.desc;
   }
 
-  // Accumulated bonus note
   var noteEl = document.getElementById('su-effect-note');
   if (prevItem && ownedPrev) {
     noteEl.textContent = '累计加成: ' + item.desc;
@@ -94,7 +101,7 @@ function _showUpgradeModal(item, tab, save) {
 }
 
 function _renderShop(tab, save) {
-  var container = document.getElementById('shop-list');
+  var container = document.getElementById('sfpGrid');
   container.innerHTML = '';
   var items = SHOP[tab] || [];
 
@@ -169,6 +176,9 @@ function _buyItem(item, tab) {
   document.getElementById('shop-confirm').style.display = 'none';
   document.getElementById('shop-upgrade').classList.remove('show');
   document.getElementById('shop-dao').textContent = '功勋：' + save.permanentDao;
+  if (document.getElementById('shopFloorPage').style.display === 'flex') {
+    document.getElementById('sfpDao').textContent = '功勋：' + save.permanentDao;
+  }
   soundManager.play('levelup');
   _renderShop(tab, save);
   if (tab === 'knowledge') _openKnowledgeLesson(item, save);
@@ -214,13 +224,13 @@ function _openKnowledgeLesson(item, save) {
     var labelMap = { '识别要点':'🔍 识别要点', '反制':'⚔️ 反制手段', '典型案例':'📋 典型案例', '数据':'📊 数据', '法律依据':'⚖️ 法律依据', '防控':'🛡️ 防控措施', '效果':'✅ 效果' };
     sections.forEach(function(sec) {
       var block = document.createElement('div');
-      block.style.cssText = 'margin-bottom:6px;padding:8px;background:#0f172a;border-radius:4px;';
+      block.style.cssText = 'margin-bottom:6px;padding:6px;background:#fff;border:1px solid #e0d5c0;border-radius:4px;';
       var title = document.createElement('div');
-      title.style.cssText = 'font-size:10px;color:' + (labelMap[sec.label] ? '#ffd700' : '#94a3b8') + ';font-weight:900;margin-bottom:3px;';
+      title.style.cssText = 'font-size:9px;color:' + (labelMap[sec.label] ? '#8b5e3c' : '#8b5e3c') + ';font-weight:900;margin-bottom:2px;';
       title.textContent = labelMap[sec.label] || sec.label;
       block.appendChild(title);
       var body = document.createElement('div');
-      body.style.cssText = 'font-size:9px;color:#e2e8f0;line-height:1.6;white-space:pre-line;';
+      body.style.cssText = 'font-size:8px;color:#3c1e0e;line-height:1.6;white-space:pre-line;';
       body.textContent = sec.content;
       block.appendChild(body);
       sectionsDiv.appendChild(block);
@@ -230,7 +240,7 @@ function _openKnowledgeLesson(item, save) {
   var quizData = SHOP_QUIZ[item.id];
   var quizDiv = document.getElementById('kl-quiz');
   quizDiv.innerHTML = '';
-  if (!quizData) { quizDiv.innerHTML = '<div style="color:#64748b;text-align:center;font-size:11px;">已学习完毕，效果永久生效</div>'; return; }
+  if (!quizData) { quizDiv.innerHTML = '<div style="color:#8b5e3c;text-align:center;font-size:10px;">已学习完毕，效果永久生效</div>'; return; }
   var bonusGiven = save.quizResults[item.id];
   quizData.q.forEach(function(q, qi) {
     var qDiv = document.createElement('div');
@@ -288,13 +298,278 @@ function _checkQuizDone(kid, quizData) {
   document.getElementById('shop-dao').textContent = '功勋：' + save.permanentDao;
   var resultDiv = document.getElementById('qr-' + kid);
   if (resultDiv) {
-    if (correctCount === 3) resultDiv.innerHTML = '🎉 全对！+5功勋 <span style="color:#4ecca3">效果已永久激活</span>';
-    else if (correctCount === 2) resultDiv.innerHTML = '👍 错1题 +2功勋 <span style="color:#4ecca3">效果已永久激活</span>';
+    if (correctCount === 3) resultDiv.innerHTML = '🎉 全对！+5功勋 <span style="color:#155724">效果已永久激活</span>';
+    else if (correctCount === 2) resultDiv.innerHTML = '👍 错1题 +2功勋 <span style="color:#155724">效果已永久激活</span>';
     else resultDiv.innerHTML = '💪 继续努力，知识点已激活';
   }
 }
 
-// Confirm modal (simples)
+// -- Elevator functions --
+
+function _showFloor(floorNum) {
+  if (_shopIsMoving) return;
+  if (floorNum === _shopCurrentFloor) return;
+  _shopIsMoving = true;
+  var save = SaveManager.load();
+  var targetData = _floorMap[String(floorNum)];
+  var currentData = _floorMap[String(_shopCurrentFloor)];
+  if (!targetData) { _shopIsMoving = false; return; }
+  var direction = floorNum > _shopCurrentFloor ? 'up' : 'down';
+
+  var cabin = document.getElementById('elevatorCabin');
+  var display = document.getElementById('floorDisplay');
+  var indicator = document.getElementById('elevatorIndicator');
+  var navBtns = document.querySelectorAll('.elevator-nav a');
+
+  navBtns.forEach(function(b) { b.classList.remove('focus'); });
+  navBtns.forEach(function(b) {
+    if (parseInt(b.dataset.floor) === floorNum) b.classList.add('focus');
+  });
+
+  indicator.classList.remove('up', 'down');
+  indicator.classList.add(direction);
+
+  cabin.classList.remove('open');
+
+  var travelTime = Math.max(500, Math.abs(floorNum - _shopCurrentFloor) * 350);
+
+  setTimeout(function() {
+    _animateFloorNumber(_shopCurrentFloor, floorNum, travelTime);
+
+    setTimeout(function() {
+      _shopCurrentFloor = floorNum;
+      display.textContent = floorNum;
+      _shopCurrentTab = targetData.tab;
+      _shopCurrentTutor = null;
+
+      var oldSub = document.getElementById('shop-sub-tabs');
+      if (oldSub) oldSub.remove();
+
+      navBtns.forEach(function(b) { b.classList.remove('active', 'focus'); });
+      navBtns.forEach(function(b) {
+        if (parseInt(b.dataset.floor) === floorNum) b.classList.add('active');
+      });
+
+      cabin.classList.add('open');
+      indicator.classList.remove('up', 'down');
+
+      setTimeout(function() {
+        _shopIsMoving = false;
+        if (floorNum === 1) {
+          _goToExterior();
+        } else {
+          _showFloorPage(floorNum, targetData, save);
+        }
+      }, 600);
+    }, travelTime);
+  }, 600);
+}
+
+function _showFloorPage(floorNum, targetData, save) {
+  var elevator = document.getElementById('shop-elevator');
+  elevator.style.transition = 'transform 0.35s ease, opacity 0.35s ease';
+  elevator.style.transform = 'scale(1.1)';
+  elevator.style.opacity = '0';
+  var page = document.getElementById('shopFloorPage');
+  page.style.display = 'flex';
+  page.style.transform = 'scale(1.1)';
+  page.style.opacity = '0';
+  page.style.transition = 'transform 0.35s ease, opacity 0.35s ease';
+  setTimeout(function() {
+    elevator.style.display = 'none';
+    elevator.style.transform = 'scale(1)';
+    elevator.style.opacity = '1';
+    page.style.transform = 'scale(1)';
+    page.style.opacity = '1';
+  }, 350);
+  var oldSub = document.getElementById('shop-sub-tabs');
+  if (oldSub) oldSub.remove();
+  document.getElementById('sfpLabel').textContent = targetData.label;
+  document.getElementById('sfpDao').textContent = '功勋：' + save.permanentDao;
+  if (targetData.tab === 'knowledge' && !_shopCurrentTutor) _shopCurrentTutor = TUTOR_POOL[0].id;
+  if (targetData.tab === 'knowledge' && TUTOR_POOL.every(function(t){return t.id!==_shopCurrentTutor})) _shopCurrentTutor = TUTOR_POOL[0].id;
+  _saveShopState();
+  _renderShop(targetData.tab, save);
+
+  if (targetData.tab === 'knowledge') {
+    var sub = document.createElement('div');
+    sub.id = 'shop-sub-tabs';
+    sub.className = 'shop-sub-tabs';
+    TUTOR_POOL.forEach(function(t) {
+      var btn = document.createElement('button');
+      btn.className = 'shop-sub-tab' + (t.id === _shopCurrentTutor ? ' active' : '');
+      btn.textContent = t.icon + ' ' + t.name;
+      btn.addEventListener('click', function() {
+        _shopCurrentTutor = t.id;
+        sub.querySelectorAll('.shop-sub-tab').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        _renderShop('knowledge', SaveManager.load());
+      });
+      sub.appendChild(btn);
+    });
+    var grid = document.getElementById('sfpGrid');
+    page.insertBefore(sub, grid);
+  }
+}
+
+document.getElementById('sfpBack').addEventListener('click', function() {
+  var page = document.getElementById('shopFloorPage');
+  var elevator = document.getElementById('shop-elevator');
+  elevator.style.display = 'flex';
+  elevator.style.transform = 'scale(1.1)';
+  elevator.style.opacity = '0';
+  elevator.style.transition = 'transform 0.35s ease, opacity 0.35s ease';
+  document.getElementById('elevatorCabin').classList.remove('open');
+  page.style.transition = 'transform 0.35s ease, opacity 0.35s ease';
+  page.style.transform = 'scale(1.1)';
+  page.style.opacity = '0';
+  setTimeout(function() {
+    page.style.display = 'none';
+    page.style.transform = 'scale(1)';
+    page.style.opacity = '1';
+    elevator.style.transform = 'scale(1)';
+    elevator.style.opacity = '1';
+  }, 350);
+  var navBtns = document.querySelectorAll('.elevator-nav a');
+  navBtns.forEach(function(b) { b.classList.remove('active'); });
+  navBtns.forEach(function(b) {
+    if (parseInt(b.dataset.floor) === _shopCurrentFloor) b.classList.add('active');
+  });
+  document.getElementById('floorDisplay').textContent = String(_shopCurrentFloor);
+  document.getElementById('elevatorIndicator').className = 'indicator';
+});
+
+function _saveShopState() {
+  try { sessionStorage.setItem('shop_floor', String(_shopCurrentFloor)); } catch(e) {}
+  try { sessionStorage.setItem('shop_tab', _shopCurrentTab); } catch(e) {}
+  try { sessionStorage.setItem('shop_tutor', _shopCurrentTutor || ''); } catch(e) {}
+}
+function _clearShopState() {
+  try { sessionStorage.removeItem('shop_floor'); } catch(e) {}
+  try { sessionStorage.removeItem('shop_tab'); } catch(e) {}
+  try { sessionStorage.removeItem('shop_tutor'); } catch(e) {}
+}
+
+function _goToExterior() {
+  document.getElementById('shopFloorPage').style.display = 'none';
+  document.getElementById('shop-elevator').style.display = 'none';
+  document.getElementById('elevatorCabin').classList.remove('open');
+  _clearShopState();
+  var ex = document.getElementById('shop-exterior');
+  ex.style.display = 'flex';
+  ex.style.opacity = '1';
+  ex.style.transform = 'scale(1)';
+  ex.style.transition = 'none';
+}
+
+function _animateFloorNumber(from, to, duration) {
+  var display = document.getElementById('floorDisplay');
+  var startTime = Date.now();
+  var diff = to - from;
+  function update() {
+    var elapsed = Date.now() - startTime;
+    var progress = Math.min(elapsed / duration, 1);
+    var current = Math.round(from + diff * progress);
+    display.textContent = current;
+    if (progress < 1) requestAnimationFrame(update);
+  }
+  update();
+}
+
+// -- Entry point --
+
+UI.on('shop', function (data) {
+  var savedFloor = null;
+  try { savedFloor = parseInt(sessionStorage.getItem('shop_floor')); } catch(e) {}
+  if (savedFloor && savedFloor > 1) {
+    document.getElementById('shop-exterior').style.display = 'none';
+    document.getElementById('shop-elevator').style.display = 'none';
+    document.getElementById('shopFloorPage').style.display = 'none';
+    var save = SaveManager.load();
+    _shopCurrentFloor = savedFloor;
+    _shopCurrentTab = _floorMap[String(savedFloor)].tab;
+    _shopCurrentTutor = null;
+    try { var st = sessionStorage.getItem('shop_tutor'); if (st) _shopCurrentTutor = st; } catch(e) {}
+    _shopIsMoving = false;
+    document.getElementById('floorDisplay').textContent = String(savedFloor);
+    document.getElementById('elevatorIndicator').className = 'indicator';
+    var navBtns = document.querySelectorAll('.elevator-nav a');
+    navBtns.forEach(function(b) { b.classList.remove('active'); });
+    navBtns.forEach(function(b) {
+      if (parseInt(b.dataset.floor) === savedFloor) b.classList.add('active');
+    });
+    var targetData = _floorMap[String(savedFloor)];
+    _showFloorPage(savedFloor, targetData, save);
+    return;
+  }
+  _clearShopState();
+  var ex = document.getElementById('shop-exterior');
+  ex.style.display = 'flex';
+  ex.style.opacity = '1';
+  ex.style.transform = 'scale(1)';
+  ex.style.transition = 'none';
+  document.getElementById('shop-elevator').style.display = 'none';
+  document.getElementById('shopFloorPage').style.display = 'none';
+  var save = SaveManager.load();
+  _shopCurrentFloor = 1;
+  _shopCurrentTutor = null;
+  _shopIsMoving = false;
+  var oldSub = document.getElementById('shop-sub-tabs');
+  if (oldSub) oldSub.remove();
+  var wrap = document.querySelector('.shop-exterior .scene-wrap');
+  wrap.style.transform = 'scale(1.7)';
+});
+
+document.getElementById('shopEnterBtn').addEventListener('click', function () {
+  var exterior = document.getElementById('shop-exterior');
+  exterior.style.transition = 'transform 0.35s ease, opacity 0.35s ease';
+  exterior.style.transform = 'scale(1.2)';
+  exterior.style.opacity = '0';
+  setTimeout(function () {
+    exterior.style.display = 'none';
+    exterior.style.transform = 'scale(1)';
+    var elevator = document.getElementById('shop-elevator');
+    elevator.style.display = 'flex';
+    elevator.style.transform = 'scale(0.85)';
+    elevator.style.opacity = '0';
+    elevator.style.transition = 'transform 0.35s ease, opacity 0.35s ease';
+    requestAnimationFrame(function() {
+      elevator.style.transform = 'scale(1)';
+      elevator.style.opacity = '1';
+    });
+    document.getElementById('elevatorCabin').classList.remove('open');
+    var navBtns = document.querySelectorAll('.elevator-nav a');
+    navBtns.forEach(function(b) { b.classList.remove('active'); });
+    navBtns.forEach(function(b) {
+      if (parseInt(b.dataset.floor) === 1) b.classList.add('active');
+    });
+    _shopCurrentFloor = 1;
+    _shopCurrentTab = 'shop';
+    _shopCurrentTutor = null;
+    document.getElementById('floorDisplay').textContent = '1';
+    document.getElementById('elevatorIndicator').className = 'indicator';
+  }, 350);
+});
+
+// Elevator nav click
+document.querySelectorAll('.elevator-nav a').forEach(function(btn) {
+  btn.addEventListener('click', function(e) {
+    e.preventDefault();
+    var floor = parseInt(this.dataset.floor);
+    if (floor === 1) {
+      _goToExterior();
+      return;
+    }
+    var elevator = document.getElementById('shop-elevator');
+    if (elevator.style.display !== 'flex') {
+      elevator.style.display = 'flex';
+      document.getElementById('shopFloorPage').style.display = 'none';
+    }
+    _showFloor(floor);
+  });
+});
+
+// Confirm modal
 document.getElementById('shop-confirm').addEventListener('click', function(e) {
   if (e.target.id === 'sc-cancel' || e.target === this) { document.getElementById('shop-confirm').style.display = 'none'; return; }
   if (e.target.id === 'sc-confirm' && _shopPendingItem) { _buyItem(_shopPendingItem, _shopCurrentTab); _shopPendingItem = null; }
@@ -321,49 +596,4 @@ document.getElementById('su-confirm').addEventListener('click', function() {
 
 document.getElementById('kl-back').addEventListener('click', function() {
   document.getElementById('knowledge-lesson').style.display = 'none';
-});
-
-UI.on('shop', function () {
-  var save = SaveManager.load();
-  document.getElementById('shop-dao').textContent = '功勋：' + save.permanentDao;
-  _shopCurrentTab = 'equipment';
-  _shopCurrentTutor = null;
-  var oldSub = document.getElementById('shop-sub-tabs');
-  if (oldSub) oldSub.remove();
-  document.querySelectorAll('.shop-tab').forEach(function(t) { t.classList.remove('active'); });
-  document.querySelector('.shop-tab[data-tab="equipment"]').classList.add('active');
-  _renderShop('equipment', save);
-});
-
-document.querySelectorAll('.shop-tab').forEach(function(tab) {
-  tab.addEventListener('click', function() {
-    var save = SaveManager.load();
-    _shopCurrentTab = this.getAttribute('data-tab');
-    _shopCurrentTutor = null;
-    var oldSub = document.getElementById('shop-sub-tabs');
-    if (oldSub) oldSub.remove();
-    document.querySelectorAll('.shop-tab').forEach(function(t) { t.classList.remove('active'); });
-    this.classList.add('active');
-
-    if (_shopCurrentTab === 'knowledge') {
-      var sub = document.createElement('div');
-      sub.id = 'shop-sub-tabs';
-      sub.className = 'shop-sub-tabs';
-      _shopCurrentTutor = TUTOR_POOL[0].id;
-      TUTOR_POOL.forEach(function(t) {
-        var btn = document.createElement('button');
-        btn.className = 'shop-sub-tab' + (t.id === _shopCurrentTutor ? ' active' : '');
-        btn.textContent = t.icon + ' ' + t.name;
-        btn.addEventListener('click', function() {
-          _shopCurrentTutor = t.id;
-          sub.querySelectorAll('.shop-sub-tab').forEach(function(b) { b.classList.remove('active'); });
-          btn.classList.add('active');
-          _renderShop('knowledge', SaveManager.load());
-        });
-        sub.appendChild(btn);
-      });
-      document.getElementById('screen-shop').insertBefore(sub, document.getElementById('shop-list'));
-    }
-    _renderShop(_shopCurrentTab, save);
-  });
 });

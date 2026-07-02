@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>沙漏加载动画</title>
+    <style>
+        /* ========== 页面基础样式 ========== */
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #DB7769;
+            overflow: hidden;
+        }
+
+        /* ========== 沙漏容器 ========== */
+        #loader {
+            position: relative;
+            width: 41px;
+            height: 40px;
+            /* 整体旋转动画：5秒周期，cubic-bezier 让旋转有顿挫感 */
+            animation: loader-rotate 5s cubic-bezier(.8, 0, .2, 1) infinite;
+        }
+
+        @keyframes loader-rotate {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            90% {
+                transform: rotate(0deg);
+            }
+
+            /* 前90%时间保持不动 */
+            100% {
+                transform: rotate(180deg);
+            }
+
+            /* 最后10%快速翻转 */
+        }
+
+        /* ========== 上半部分（倒三角） ========== */
+        #top {
+            width: 1px;
+            height: 0;
+            border-top: 20px solid #fff;
+            border-right: 20px solid transparent;
+            border-left: 20px solid transparent;
+            transform-origin: 50% 100%;
+            /* 以底部中点为旋转/缩放中心 */
+            animation: top-shrink 5s linear infinite;
+        }
+
+        @keyframes top-shrink {
+            0% {
+                transform: scale(1);
+            }
+
+            90% {
+                transform: scale(0);
+            }
+
+            /* 前90%逐渐缩小至消失（沙子漏完） */
+            100% {
+                transform: scale(0);
+            }
+        }
+
+        /* ========== 下半部分（正三角） ========== */
+        #bottom {
+            width: 1px;
+            height: 0;
+            border-right: 20px solid transparent;
+            border-bottom: 20px solid #fff;
+            border-left: 20px solid transparent;
+            transform-origin: 50% 100%;
+            transform: scale(0);
+            animation: bottom-grow 5s linear infinite;
+        }
+
+        @keyframes bottom-grow {
+            0% {
+                transform: scale(0);
+            }
+
+            10% {
+                transform: scale(0);
+            }
+
+            /* 前10%保持隐藏（沙子还没漏下来） */
+            90% {
+                transform: scale(1);
+            }
+
+            /* 10%-90%逐渐放大（沙子堆积） */
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        /* ========== 中间沙流（虚线） ========== */
+        #line {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 0;
+            height: 0;
+            border-left: 1px dotted #fff;
+            animation: line-drop 5s linear infinite;
+        }
+
+        @keyframes line-drop {
+            0% {
+                height: 0;
+            }
+
+            10% {
+                height: 20px;
+            }
+
+            /* 10%时沙流出现并延伸到下半部 */
+            100% {
+                height: 20px;
+            }
+        }
+
+        /* ========== 标题文字 ========== */
+        h4 {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            margin: 0;
+            font-family: sans-serif;
+            font-weight: 200;
+            color: #fff;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loader">
+        <div id="top"></div> <!-- 上半部分：装沙的容器 -->
+        <div id="bottom"></div> <!-- 下半部分：接沙的容器 -->
+        <div id="line"></div> <!-- 中间沙流 -->
+    </div>
+    <h4>Loader #5</h4>
+</body>
+
+</html>

@@ -113,16 +113,22 @@ function _showArchiveModal(icon, name, detail, desc) {
 function _renderArchiveItems() {
   var content = document.getElementById('archive-content');
   if (!content) return;
-  var names = Object.keys(ITEM_ENCYCLOPEDIA);
+  var save = SaveManager.load();
+  var seen = save.seenItems || [];
+  if (!seen.length) {
+    content.innerHTML = '<div class="archive-total">🔍 已遭遇 0 件</div>' +
+      '<div style="text-align:center;color:#c4a882;font-size:13px;padding:40px 10px">暂无已遭遇的违禁品<br><span style="font-size:10px;">完成关卡时遭遇的物品会自动记录</span></div>';
+    return;
+  }
   var cats = {};
-  names.forEach(function (n) {
-    var e = ITEM_ENCYCLOPEDIA[n];
+  seen.forEach(function (s) {
+    var e = ITEM_ENCYCLOPEDIA[s.name];
     var c = e && e.cat || '其他';
     if (!cats[c]) cats[c] = [];
-    cats[c].push(n);
+    if (cats[c].indexOf(s.name) === -1) cats[c].push(s.name);
   });
   var html = '';
-  html += '<div class="archive-total">共 ' + names.length + ' 种违禁品/走私方式</div>';
+  html += '<div class="archive-total">🔍 已遭遇 ' + seen.length + ' 件</div>';
   var catKeys = Object.keys(cats).sort();
   catKeys.forEach(function (cat) {
     html += '<div class="archive-group-title">' + (_CAT2ICON[cat] || '📋') + ' ' + cat + '</div>';
@@ -154,78 +160,43 @@ function _renderArchiveFragments() {
   if (!content) return;
   var save = SaveManager.load();
   var unlocked = save.fragments || [];
-  var html = '';
-  unlocked.forEach(function (id) {
-    var text = FRAGMENTS[id] || '暂无内容';
-    html += '<div class="archive-frag">';
-    html += '<span>' + id + ': ' + text.substring(0, 60) + '</span>';
-    html += '</div>';
-  });
+  var allIds = Object.keys(FRAGMENTS);
+  var html = '<div class="archive-total">📜 已解锁 ' + unlocked.length + '/' + allIds.length + '</div>';
   if (!unlocked.length) {
-    html = '<div style="text-align:center;color:#64748b;font-size:13px;padding:40px 0">暂无解锁的剧情碎片</div>';
+    html += '<div style="text-align:center;color:#c4a882;font-size:13px;padding:40px 0">暂无解锁的剧情碎片<br><span style="font-size:10px;">完成关卡有概率获得</span></div>';
+  } else {
+    unlocked.forEach(function (id) {
+      var text = FRAGMENTS[id] || '暂无内容';
+      html += '<div class="archive-frag">';
+      html += '<span class="archive-frag-id">' + id + '</span>';
+      html += '<span>' + text + '</span>';
+      html += '</div>';
+    });
   }
-  html = '<div class="archive-total">已解锁 ' + unlocked.length + '/' + Object.keys(FRAGMENTS).length + '</div>' + html;
   content.innerHTML = html;
 }
 
-function _renderArchiveTutors() {
-  var content = document.getElementById('archive-content');
-  if (!content) return;
-  var save = SaveManager.load();
-  var aff = save.tutorAffinity || {};
-  var html = '<div class="archive-tutor-grid">';
-  TUTOR_POOL.forEach(function (t) {
-    var a = aff[t.id] || 0;
-    html += '<div class="archive-tutor-row" data-tutor="' + t.id + '">';
-    html += '<div class="archive-tutor-icon">' + t.icon + '</div>';
-    html += '<div class="archive-tutor-name">' + t.name + '</div>';
-    html += '<div class="archive-tutor-bar-bg"><div class="archive-tutor-bar-fill" style="width:' + a + '%"></div></div>';
-    html += '<div class="archive-tutor-aff">' + a + '/100</div>';
-    html += '</div>';
-  });
-  html += '</div>';
-  content.innerHTML = html;
-}
 
-function _renderArchiveIntuitions() {
-  var content = document.getElementById('archive-content');
-  if (!content) return;
-  var save = SaveManager.load();
-  var unlocked = save.echoSkills || [];
-  var html = '<div class="archive-total">已解锁 ' + unlocked.length + '/' + ECHO_POOL.length + '</div>';
-  html += '<div class="archive-echos">';
-  ECHO_POOL.forEach(function (e) {
-    var has = unlocked.indexOf(e.id) >= 0;
-    html += '<div class="archive-echo" style="' + (has ? '' : 'opacity:0.4') + '" data-id="' + e.id + '">';
-    html += '<div style="font-size:28px">' + e.icon + '</div>';
-    html += '<div style="font-size:11px;color:' + (has ? '#ffd700' : '#64748b') + ';font-weight:900">' + e.name + '</div>';
-    html += '<div style="font-size:9px;color:' + (has ? '#e2e8f0' : '#475569') + ';text-align:center">' + e.desc + '</div>';
-    if (!has) html += '<div style="font-size:8px;color:#475569;margin-top:2px">🔒 未解锁</div>';
-    html += '</div>';
-  });
-  html += '</div>';
-  content.innerHTML = html;
-}
 
 function _updateArchiveStats(tab) {
-  var names = Object.keys(ITEM_ENCYCLOPEDIA);
-  document.getElementById('as-total').textContent = names.length;
   var save = SaveManager.load();
   var unlocked = 0;
-  if (tab === 'items') unlocked = names.length;
-  else if (tab === 'fragments') unlocked = (save.fragments || []).length;
-  else if (tab === 'tutors') {
-    var aff = save.tutorAffinity || {};
-    unlocked = TUTOR_POOL.filter(function (t) { return (aff[t.id] || 0) > 0; }).length;
-  } else if (tab === 'intuitions') unlocked = (save.echoSkills || []).length;
+  var total = 0;
+  if (tab === 'items') {
+    var seen = save.seenItems || [];
+    unlocked = seen.length;
+    total = Object.keys(ITEM_ENCYCLOPEDIA).length;
+  } else if (tab === 'fragments') {
+    unlocked = (save.fragments || []).length;
+    total = Object.keys(FRAGMENTS).length;
+  }
+  document.getElementById('as-total').textContent = total;
   document.getElementById('as-unlocked').textContent = unlocked;
 }
 
 var _tabHandlers = {
   items: function () { _renderArchiveItems(); _updateArchiveStats('items'); },
-  fragments: function () { _renderArchiveFragments(); _updateArchiveStats('fragments'); },
-  tutors: function () { _renderArchiveTutors(); _updateArchiveStats('tutors'); },
-  intuitions: function () { _renderArchiveIntuitions(); _updateArchiveStats('intuitions'); }
+  fragments: function () { _renderArchiveFragments(); _updateArchiveStats('fragments'); }
 };
 
 UI.on('archive', function () {

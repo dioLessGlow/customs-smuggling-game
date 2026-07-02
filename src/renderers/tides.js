@@ -246,15 +246,15 @@ var TidesBg = (function () {
     var hh = Math.floor(hours) % 24;
     var mm = Math.floor((hours % 1) * 60);
     var timeStr = ('0' + hh).slice(-2) + ':' + ('0' + mm).slice(-2);
-    // 文字阴影
-    ctx.shadowColor = 'rgba(0,0,0,0.4)';
+    var txt=getTextColors();
+    ctx.shadowColor = txt.shadow;
     ctx.shadowBlur = 12;
     ctx.textAlign = 'right';
     ctx.textBaseline = 'top';
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillStyle = txt.secondary;
     ctx.font = '12px "PingFang SC","Microsoft YaHei",sans-serif';
     ctx.fillText(P.name, W - 14, 12);
-    ctx.fillStyle = '#fff';
+    ctx.fillStyle = txt.primary;
     ctx.font = 'bold 24px "Noto Serif SC","Songti SC","SimSun",serif';
     ctx.fillText(timeStr, W - 14, 28);
     ctx.shadowBlur = 0;
@@ -268,5 +268,44 @@ var TidesBg = (function () {
   }
 
   function getCanvas(){return canvas}
-  return {init:init,update:update,getCanvas:getCanvas,buildLayers:function(){}};
+  function getCurrentLuminance(){
+    var P=getPalette(timeOfDay);
+    var c=P.skyHor;
+    return (0.299*c[0] + 0.587*c[1] + 0.114*c[2])/255;
+  }
+  function getTextColors(){
+    var P=getPalette(timeOfDay);
+    var c=P.skyHor;
+    var luma=(0.299*c[0] + 0.587*c[1] + 0.114*c[2])/255;
+    // determine dominant hue
+    var max=Math.max(c[0],c[1],c[2]);
+    var isWarm=c[0]>c[2]&&c[1]<c[0];
+    var isCool=c[2]>c[0];
+    var primary,secondary,shadow;
+    if(luma<0.2){
+      primary='rgba(255,255,255,0.95)';
+      secondary='rgba(200,200,200,0.7)';
+      shadow='rgba(0,0,0,0.5)';
+    }else if(luma<0.35){
+      primary='rgba(240,240,245,0.92)';
+      secondary='rgba(180,185,195,0.75)';
+      shadow='rgba(0,0,0,0.35)';
+    }else if(luma<0.55){
+      if(isWarm){
+        primary='#1e293b'; secondary='#475569'; shadow='rgba(255,255,255,0.4)';
+      }else{
+        primary='#3c1e0e'; secondary='#8b5e3c'; shadow='rgba(255,255,255,0.3)';
+      }
+    }else{
+      if(isWarm){
+        primary='#1a1a2e'; secondary='#4a4a6a'; shadow='rgba(255,235,200,0.35)';
+      }else if(isCool&&c[1]>c[0]*0.8){
+        primary='#3c1e0e'; secondary='#8b5e3c'; shadow='rgba(255,255,255,0.35)';
+      }else{
+        primary='#1e293b'; secondary='#475569'; shadow='rgba(255,255,255,0.3)';
+      }
+    }
+    return {primary:primary,secondary:secondary,shadow:shadow};
+  }
+  return {init:init,update:update,getCanvas:getCanvas,buildLayers:function(){},getCurrentLuminance:getCurrentLuminance,getTextColors:getTextColors};
 })();

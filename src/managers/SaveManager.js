@@ -37,7 +37,12 @@ var SaveManager = {
       lastLoginDate: '',
       loginStreak: 0,
       // tutor affinity v3.3
-      tutorAffinity: { linrui:0, chenfeng:0, zhaohai:0, baiwei:0, laozhou:0, xiaohui:0 }
+      tutorAffinity: { linrui:0, chenfeng:0, zhaohai:0, baiwei:0, laozhou:0, xiaohui:0 },
+      // custom tutor names
+      tutorNames: {},
+      // daily guarantee for level entry when dao exhausted
+      guaranteeDaily: 3,
+      guaranteeDate: ''
     };
   },
 
@@ -71,6 +76,9 @@ var SaveManager = {
     if (!old.lastLoginDate) old.lastLoginDate = def.lastLoginDate;
     if (!old.loginStreak) old.loginStreak = def.loginStreak;
     if (!old.tutorAffinity) old.tutorAffinity = def.tutorAffinity;
+    if (!old.tutorNames) old.tutorNames = {};
+    if (old.guaranteeDaily === undefined) old.guaranteeDaily = 3;
+    if (old.guaranteeDate === undefined) old.guaranteeDate = '';
     return old;
   },
 
@@ -110,6 +118,9 @@ var SaveManager = {
     } else {
       save.loginStreak = 1;
     }
+    // reset daily guarantee
+    save.guaranteeDaily = 3;
+    save.guaranteeDate = today;
     save.lastLoginDate = today;
     this.save(save);
     return save;

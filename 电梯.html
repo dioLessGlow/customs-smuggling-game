@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>电梯楼层导航</title>
+    <link href="https://fonts.googleapis.com/css2?family=Wallpoet&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --grey-01: #989898;
+            --grey-02: #7b7a7a;
+            --grey-03: #838282;
+            --wall: #2a2a2a;
+            --door: #a3a3a3;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        html,
+        body {
+            height: 100%;
+            overflow: hidden;
+            background: var(--wall);
+            font-family: 'Wallpoet', monospace;
+        }
+
+        /* 电梯单独居中 */
+        .elevator-shaft {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 340px;
+            background: #1a1a1a;
+            border: 5px solid #444;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 3px;
+        }
+
+        .floor-display {
+            position: absolute;
+            top: -36px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: black;
+            width: 70px;
+            height: 28px;
+            color: orange;
+            font-family: 'Wallpoet', monospace;
+            font-size: 16px;
+            text-align: center;
+            line-height: 28px;
+            border: 1px solid #333;
+            border-radius: 3px;
+            letter-spacing: 2px;
+        }
+
+        .cabin {
+            width: 88%;
+            height: 85%;
+            background: var(--grey-03);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .door-left,
+        .door-right {
+            position: absolute;
+            top: 0;
+            width: 50%;
+            height: 100%;
+            background: linear-gradient(90deg, #888 0%, var(--door) 50%, #888 100%);
+            transition: transform 1s ease-in-out;
+            z-index: 10;
+        }
+
+        .door-left {
+            left: 0;
+            border-right: 1px solid #666;
+        }
+
+        .door-right {
+            right: 0;
+            border-left: 1px solid #666;
+        }
+
+        .door-left::after,
+        .door-right::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(0deg,
+                    transparent,
+                    transparent 14px,
+                    rgba(0, 0, 0, 0.1) 14px,
+                    rgba(0, 0, 0, 0.1) 15px);
+        }
+
+        .cabin.open .door-left {
+            transform: translateX(-100%);
+        }
+
+        .cabin.open .door-right {
+            transform: translateX(100%);
+        }
+
+        .floor-content {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--grey-02);
+            position: relative;
+        }
+
+        .floor-content .ceiling {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 18px;
+            background: #c8c6c6;
+        }
+
+        .floor-content .floor-ground {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 18px;
+            background: var(--grey-01);
+        }
+
+        .floor-content .content-text {
+            color: white;
+            font-size: 42px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            font-family: 'Wallpoet', monospace;
+        }
+
+        .floor-content .content-desc {
+            color: #aaa;
+            font-size: 10px;
+            margin-top: 8px;
+            font-family: -apple-system, sans-serif;
+        }
+
+        /* 按钮单独定位在电梯右侧 */
+        .nav {
+            position: absolute;
+            left: calc(50% + 110px);
+            top: 50%;
+            transform: translateY(-50%);
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .nav li {
+            margin: 0;
+        }
+
+        .nav a {
+            font-family: 'Wallpoet', monospace;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #444;
+            line-height: 36px;
+            display: block;
+            color: white;
+            text-decoration: none;
+            font-size: 13px;
+            text-align: center;
+            transition: all 0.2s ease;
+            border: 2px solid transparent;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .nav a:active {
+            transform: scale(0.92);
+            background: #555;
+        }
+
+        .nav a.active {
+            color: black;
+            font-weight: bold;
+            background: orange;
+        }
+
+        .nav a.focus {
+            color: black;
+            font-weight: bold;
+            border: 2px solid green;
+            background: #ffcc00;
+            animation: pulse 0.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes pulse {
+            from {
+                transform: scale(1);
+            }
+
+            to {
+                transform: scale(1.08);
+            }
+        }
+
+        .indicator {
+            position: absolute;
+            top: -36px;
+            right: 10px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #333;
+            transition: all 0.3s;
+        }
+
+        .indicator.up {
+            background: #0f0;
+            box-shadow: 0 0 6px #0f0;
+        }
+
+        .indicator.down {
+            background: #f00;
+            box-shadow: 0 0 6px #f00;
+        }
+
+        @media (max-height: 500px) {
+            .elevator-shaft {
+                width: 180px;
+                height: 280px;
+            }
+
+            .nav {
+                left: calc(50% + 100px);
+            }
+
+            .nav a {
+                width: 32px;
+                height: 32px;
+                line-height: 32px;
+                font-size: 12px;
+            }
+
+            .floor-content .content-text {
+                font-size: 36px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="elevator-shaft">
+        <div class="floor-display" id="floorDisplay">4</div>
+        <div class="indicator" id="indicator"></div>
+        <div class="cabin open" id="cabin">
+            <div class="door-left" id="doorLeft"></div>
+            <div class="door-right" id="doorRight"></div>
+            <div class="floor-content" id="floorContent">
+                <div class="ceiling"></div>
+                <div class="content-text" id="contentText">4</div>
+                <div class="content-desc" id="contentDesc">当前楼层</div>
+                <div class="floor-ground"></div>
+            </div>
+        </div>
+    </div>
+
+    <ul class="nav" id="nav">
+        <li><a href="#" data-floor="04" data-num="4">4</a></li>
+        <li><a href="#" data-floor="03" data-num="3">3</a></li>
+        <li><a href="#" data-floor="02" data-num="2">2</a></li>
+        <li><a href="#" data-floor="01" data-num="1">1</a></li>
+    </ul>
+
+    <script>
+        (function () {
+            var floors = [
+                { id: '04', label: '4', num: 4 },
+                { id: '03', label: '3', num: 3 },
+                { id: '02', label: '2', num: 2 },
+                { id: '01', label: '1', num: 1 }
+            ];
+
+            var currentFloor = '04';
+            var isMoving = false;
+            var soundWait, soundFinish;
+
+            var el = {
+                cabin: document.getElementById('cabin'),
+                floorDisplay: document.getElementById('floorDisplay'),
+                contentText: document.getElementById('contentText'),
+                indicator: document.getElementById('indicator'),
+                nav: document.getElementById('nav')
+            };
+
+            var initialBtn = el.nav.querySelector('[data-floor="04"]');
+            if (initialBtn) initialBtn.classList.add('active');
+
+            el.nav.querySelectorAll('a').forEach(function (btn) {
+                btn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    var targetFloor = this.dataset.floor;
+                    if (isMoving || targetFloor === currentFloor) return;
+                    runElevator(targetFloor);
+                });
+            });
+
+            function getBtn(floorId) {
+                return el.nav.querySelector('[data-floor="' + floorId + '"]');
+            }
+
+            function runElevator(targetFloor) {
+                isMoving = true;
+                var currentData = floors.find(function (f) { return f.id === currentFloor; });
+                var targetData = floors.find(function (f) { return f.id === targetFloor; });
+                var direction = targetData.num > currentData.num ? 'up' : 'down';
+
+                if (navigator.vibrate) navigator.vibrate(30);
+
+                el.nav.querySelectorAll('a').forEach(function (btn) {
+                    btn.classList.remove('focus');
+                });
+                getBtn(targetFloor).classList.add('focus');
+
+                el.indicator.classList.remove('up', 'down');
+                el.indicator.classList.add(direction);
+
+                try {
+                    soundWait = new Audio('http://aribart-vincent.fr/music/elevator.mp3');
+                    soundFinish = new Audio('http://aribart-vincent.fr/music/ding.mp3');
+                } catch (e) { }
+
+                el.cabin.classList.remove('open');
+
+                setTimeout(function () {
+                    if (soundWait) soundWait.play();
+
+                    var floorDiff = Math.abs(targetData.num - currentData.num);
+                    var travelTime = Math.max(600, floorDiff * 400);
+                    animateFloorNumber(currentData.num, targetData.num, travelTime);
+
+                    setTimeout(function () {
+                        if (soundWait) soundWait.pause();
+                        if (soundFinish) soundFinish.play();
+                        if (navigator.vibrate) navigator.vibrate([60, 30, 60]);
+
+                        currentFloor = targetFloor;
+                        el.floorDisplay.textContent = targetData.label;
+                        el.contentText.textContent = targetData.label;
+
+                        el.nav.querySelectorAll('a').forEach(function (btn) {
+                            btn.classList.remove('active', 'focus');
+                        });
+                        getBtn(targetFloor).classList.add('active');
+
+                        el.cabin.classList.add('open');
+                        el.indicator.classList.remove('up', 'down');
+
+                        setTimeout(function () {
+                            isMoving = false;
+                        }, 1000);
+
+                    }, travelTime);
+
+                }, 1000);
+            }
+
+            function animateFloorNumber(from, to, duration) {
+                var startTime = Date.now();
+                var diff = to - from;
+
+                function update() {
+                    var elapsed = Date.now() - startTime;
+                    var progress = Math.min(elapsed / duration, 1);
+                    var current = Math.round(from + diff * progress);
+                    el.floorDisplay.textContent = current;
+                    if (progress < 1) requestAnimationFrame(update);
+                }
+                update();
+            }
+        })();
+    </script>
+</body>
+
+</html>

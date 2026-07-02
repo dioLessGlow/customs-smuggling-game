@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人中心</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Nunito+Sans:wght@400;900&family=Roboto:wght@400;500&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root {
+            --logo: #3DBB3D;
+            --gray: #777777;
+            --black: #070707;
+            --green: #7ED386;
+            --aqua: #3FB6A8;
+            --white: #FFFFFF;
+            --hulu: 'Nunito Sans', sans-serif;
+            --heading: 'Montserrat', sans-serif;
+            --body: 'Roboto', sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(to right, var(--aqua), var(--green));
+            font-family: var(--body);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: var(--white);
+            width: 540px;
+            height: 420px;
+            position: relative;
+            box-shadow: 2px 5px 20px rgba(119, 119, 119, 0.5);
+            border-radius: 4px;
+            overflow: visible;
+        }
+
+        .logo-area {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 10;
+        }
+
+        .logo {
+            font-family: var(--hulu);
+            color: var(--logo);
+            font-weight: 900;
+            font-size: 1.5em;
+            letter-spacing: 1px;
+        }
+
+        .leftbox {
+            position: absolute;
+            top: -30px;
+            left: 5%;
+            width: 15%;
+            height: calc(100% + 60px);
+            background: var(--green);
+            box-shadow: 3px 3px 10px rgba(119, 119, 119, 0.5);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 20px;
+            z-index: 5;
+        }
+
+        nav {
+            width: 100%;
+        }
+
+        nav a {
+            display: block;
+            padding: 25px 0;
+            color: var(--white);
+            font-size: 1.3em;
+            text-align: center;
+            transition: all 0.3s ease-in-out;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        nav a:hover {
+            color: var(--aqua);
+            transform: scale(1.2);
+        }
+
+        nav a:first-child {
+            margin-top: 20px;
+        }
+
+        nav a.active {
+            color: var(--aqua);
+        }
+
+        .rightbox {
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 75%;
+            height: 100%;
+            padding: 0 30px;
+            overflow-y: auto;
+        }
+
+        .panel {
+            transition: opacity 0.5s ease-in;
+            position: absolute;
+            width: 90%;
+            opacity: 1;
+        }
+
+        .panel.noshow {
+            opacity: 0;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .panel h1 {
+            font-family: var(--heading);
+            color: var(--green);
+            font-size: 1.2em;
+            margin-top: 40px;
+            margin-bottom: 25px;
+        }
+
+        .panel h2 {
+            color: var(--gray);
+            font-family: var(--body);
+            width: 80%;
+            text-transform: uppercase;
+            font-size: 10px;
+            letter-spacing: 1px;
+            margin-left: 2px;
+            margin-top: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel p {
+            border-width: 1px;
+            border-style: solid;
+            border-image: linear-gradient(to right, var(--aqua), rgba(126, 211, 134, 0.5)) 1 0%;
+            border-top: 0;
+            width: 80%;
+            font-family: var(--heading);
+            font-size: 0.8em;
+            padding: 10px 0;
+            color: var(--black);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel span {
+            font-size: 0.7em;
+            color: var(--gray);
+        }
+
+        .btn {
+            font-family: var(--body);
+            text-transform: uppercase;
+            font-size: 9px;
+            border: none;
+            color: var(--aqua);
+            background: none;
+            cursor: pointer;
+            padding: 2px 5px;
+        }
+
+        .btn:hover {
+            text-decoration: underline;
+            font-weight: 900;
+        }
+
+        input {
+            border: 1px solid #ddd;
+            font-family: var(--body);
+            padding: 4px;
+            width: 120px;
+            font-size: 0.9em;
+        }
+
+        footer {
+            position: absolute;
+            width: 20%;
+            bottom: 10px;
+            right: 10px;
+            text-align: right;
+            font-size: 0.7em;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-family: var(--body);
+            color: var(--gray);
+        }
+
+        footer a {
+            color: var(--aqua);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            color: var(--gray);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="logo-area">
+            <h1 class="logo">hulu</h1>
+        </div>
+
+        <div class="leftbox">
+            <nav>
+                <a id="profile" class="active" title="个人资料"><i class="fa fa-user"></i></a>
+                <a id="payment" title="支付信息"><i class="fa fa-credit-card"></i></a>
+                <a id="subscription" title="订阅管理"><i class="fa fa-tv"></i></a>
+                <a id="privacy" title="隐私设置"><i class="fa fa-tasks"></i></a>
+                <a id="settings" title="账户设置"><i class="fa fa-cog"></i></a>
+            </nav>
+        </div>
+
+        <div class="rightbox">
+            <div class="panel profile" id="panel-profile">
+                <h1>个人信息</h1>
+                <h2>姓名</h2>
+                <p>朱莉·帕克 <button class="btn">更新</button></p>
+                <h2>生日</h2>
+                <p>7 月 21 日</p>
+                <h2>性别</h2>
+                <p>女</p>
+                <h2>邮箱</h2>
+                <p>example@example.com <button class="btn">更新</button></p>
+                <h2>密码</h2>
+                <p>••••••• <button class="btn">修改</button></p>
+            </div>
+
+            <div class="panel payment noshow" id="panel-payment">
+                <h1>支付信息</h1>
+                <h2>支付方式</h2>
+                <p>万事达卡 •••• •••• •••• 0000 <button class="btn">更新</button></p>
+                <h2>账单地址</h2>
+                <p>西雅图示例大道 1234 号 <button class="btn">更改</button></p>
+                <h2>邮政编码</h2>
+                <p>999000</p>
+                <h2>账单历史</h2>
+                <p>2018 年 <button class="btn">查看</button></p>
+                <h2>兑换礼品订阅</h2>
+                <p><input type="text" placeholder="输入礼品码"> <button class="btn">兑换</button></p>
+            </div>
+
+            <div class="panel subscription noshow" id="panel-subscription">
+                <h1>我的订阅</h1>
+                <h2>付款日期</h2>
+                <p>2018-05-15 <button class="btn">立即支付</button></p>
+                <h2>下次扣款</h2>
+                <p>$8.48 <span>含税</span></p>
+                <h2>Hulu 基础套餐</h2>
+                <p>有限广告 <button class="btn">更换套餐</button></p>
+                <h2>附加服务</h2>
+                <p>无 <button class="btn">管理</button></p>
+                <h2>每月合计</h2>
+                <p>$7.99/月</p>
+            </div>
+
+            <div class="panel privacy noshow" id="panel-privacy">
+                <h1>隐私设置</h1>
+                <h2>管理邮件通知 <button class="btn">管理</button></h2>
+                <p></p>
+                <h2>管理隐私设置 <button class="btn">管理</button></h2>
+                <p></p>
+                <h2>查看使用条款 <button class="btn">查看</button></h2>
+                <p></p>
+                <h2>个性化广告体验 <button class="btn">更新</button></h2>
+                <p></p>
+                <h2>保护账户安全 <button class="btn">保护</button></h2>
+                <p></p>
+            </div>
+
+            <div class="panel settings noshow" id="panel-settings">
+                <h1>账户设置</h1>
+                <h2>同步观看列表 <button class="btn">同步</button></h2>
+                <p></p>
+                <h2>暂停订阅 <button class="btn">暂停</button></h2>
+                <p></p>
+                <h2>取消订阅 <button class="btn">取消</button></h2>
+                <p></p>
+                <h2>我的设备 <button class="btn">管理设备</button></h2>
+                <p></p>
+                <h2>推荐奖励 <button class="btn">领 $10</button></h2>
+                <p></p>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+
+    <script>
+        $(document).ready(function () {
+            $('nav a').click(function (e) {
+                e.preventDefault();
+                $('nav a').removeClass('active');
+                $(this).addClass('active');
+                var targetId = $(this).attr('id');
+                $('.panel').addClass('noshow');
+                $('#panel-' + targetId).removeClass('noshow');
+            });
+        });
+    </script>
+</body>
+
+</html>

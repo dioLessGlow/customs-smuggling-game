@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>沙画绘图板</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            background: #2a2520;
+            touch-action: none;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        #rotate-hint {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #1e1a16;
+            z-index: 99999;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #f0e6d3;
+            text-align: center;
+            padding: 20px;
+        }
+
+        #rotate-hint .icon {
+            font-size: 60px;
+            margin-bottom: 20px;
+            animation: rotatePhone 2s ease-in-out infinite;
+        }
+
+        @keyframes rotatePhone {
+
+            0%,
+            100% {
+                transform: rotate(0deg);
+            }
+
+            50% {
+                transform: rotate(90deg);
+            }
+        }
+
+        #rotate-hint h2 {
+            font-size: 22px;
+            margin-bottom: 10px;
+            color: #c4956a;
+        }
+
+        #rotate-hint p {
+            font-size: 14px;
+            color: #8a7a6a;
+            line-height: 1.6;
+        }
+
+        @media screen and (orientation: portrait) and (max-width: 768px) {
+            #rotate-hint {
+                display: flex !important;
+            }
+        }
+    </style>
+    <base target="_blank">
+    <base target="_blank">
+</head>
+
+<body>
+    <div id="rotate-hint">
+        <div class="icon">📱</div>
+        <h2>请横屏使用</h2>
+        <p>沙画绘图板为横屏设计<br>请将手机旋转至横屏方向</p>
+    </div>
+
+    <script type="module">
+        import zim from "https://zimjs.org/cdn/019/zim";
+
+        const frame = new Frame(FIT, 1024, 768, lighter, dark, ready);
+
+        function ready() {
+            const C_TOOLBAR = "#1e1a16";
+            const C_TOOLBAR_BORDER = "#3d342b";
+            const C_ACCENT = "#c4956a";
+            const C_ACCENT_LIGHT = "#d4b58a";
+            const C_TEXT = "#f0e6d3";
+            const C_TEXT_DIM = "#8a7a6a";
+            const C_DANGER = "#c75450";
+            const C_SUCCESS = "#5a9e6e";
+            const C_INFO = "#5a8eb8";
+
+            const isMobile = zim.Mobile;
+            const btnH = isMobile ? 80 : 50;
+
+            // ========== 1. 背景 ==========
+            new Pic("https://assets.codepen.io/2104200/sand.jpg").addTo().noMouse();
+
+            // ========== 2. 绘图层系统 ==========
+            const drawLayer = new Container(W, H).addTo();
+            const previewLayer = new Container(W, H).addTo().noMouse();
+
+            // ========== 3. 历史记录栈（多步撤销/重做）==========
+            let historyStack = [];
+            let historyIndex = -1;
+            const MAX_HISTORY = 30;
+
+            function saveHistory() {
+                try {
+                    const dataURL = S.canvas.toDataURL("image/png");
+                    historyStack = historyStack.slice(0, historyIndex + 1);
+                    historyStack.push(dataURL);
+                    if (historyStack.length > MAX_HISTORY) {
+                        historyStack.shift();
+                    } else {
+                        historyIndex++;
+                    }
+                    updateUndoRedoButtons();
+                } catch (e) { }
+            }
+
+            function undo() {
+                if (historyIndex > 0) {
+                    historyIndex--;
+                    restoreFromHistory();
+                } else if (historyIndex === 0) {
+                    drawLayer.removeAllChildren();
+                    historyIndex = -1;
+                    S.update();
+                    updateUndoRedoButtons();
+                }
+            }
+
+            function redo() {
+                if (historyIndex < historyStack.length - 1) {
+                    historyIndex++;
+                    restoreFromHistory();
+                }
+            }
+
+            function restoreFromHistory() {
+                if (historyIndex < 0 || historyIndex >= historyStack.length) return;
+                const img = new Image();
+                img.onload = () => {
+                    drawLayer.removeAllChildren();
+                    new Bitmap(img).addTo(drawLayer);
+                    S.update();
+                };
+                img.src = historyStack[historyIndex];
+                updateUndoRedoButtons();
+            }
+
+            function updateUndoRedoButtons() {
+                if (undoBtn) undoBtn.alp(historyIndex >= 0 ? 1 : 0.4);
+                if (redoBtn) redoBtn.alp(historyIndex < historyStack.length - 1 ? 1 : 0.4);
+            }
+
+            // ========== 4. 笔刷系统 ==========
+            const BrushType = {
+                SPLATTER: "splatter",
+                LINE: "line",
+                INK: "ink",
+                ERASER: "eraser",
+                STAMP: "stamp",
+                SYMMETRY: "symmetry"
+            };
+            let currentBrush = BrushType.SPLATTER;
+            let currentPen = null;
+            let currentController = null;
+            let brushSize = isMobile ? 12 : 8;
+            let brushAlpha = 1;
+            let currentColor = brown;
+            let isSymmetryMode = false;
+            let isDrawing = false;
+
+            // 预览圆圈
+            let previewCircle = null;
+
+            function updatePreview() {
+                if (previewCircle) {
+                    previewCircle.radius = Math.max(4, Math.min(40, brushSize));
+                    previewCircle.color = currentBrush === BrushType.ERASER ? "#d4c4a8" : C_ACCENT;
+                }
+            }
+
+            // 沙粒音效
+            let audioCtx = null;
+            function initAudio() {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            function playSandSound(intensity) {
+                if (!audioCtx) return;
+                try {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    const filter = audioCtx.createBiquadFilter();
+
+                    osc.type = 'sawtooth';
+                    osc.frequency.value = 200 + Math.random() * 400;
+                    filter.type = 'lowpass';
+                    filter.frequency.value = 800 + Math.random() * 1200;
+                    gain.gain.value = 0.02 * intensity * brushAlpha;
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+
+                    osc.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.05);
+                } catch (e) { }
+            }
+
+            // 橡皮擦：使用 ZIM Shape + compositeOperation
+            // 通过直接操作 Shape 的 graphics 来设置 compositeOperation
+            let eraserShape = null;
+            let eraserLastPoint = null;
+
+            function setupEraser() {
+                // 清理之前的橡皮擦
+                if (eraserShape) {
+                    eraserShape.removeFrom();
+                    eraserShape = null;
+                }
+                eraserLastPoint = null;
+
+                // 创建 Shape 对象
+                eraserShape = new Shape(W, H).addTo(drawLayer);
+
+                // 设置 compositeOperation 为 destination-out
+                // 在 ZIM/CreateJS 中，可以通过设置 cache 或使用原生 canvas 来实现
+                // 这里我们使用一个技巧：在 Shape 的 tick 事件中设置 compositeOperation
+
+                // 但更简单的方式是：直接操作 Shape 的 _ctx
+                // 但这可能不可靠...
+
+                // 最终方案：使用原生 Canvas API，但只在 Shape 的绘制回调中使用
+                // 或者：使用一个独立的 canvas 作为 Shape 的内容
+
+                // 让我尝试另一种方式：
+                // 使用 Shape 的 graphics 命令，但设置 compositeOperation
+                // CreateJS 的 Graphics 不支持直接设置 compositeOperation
+                // 但可以通过设置 Shape 的 compositeOperation 属性来实现
+
+                // 在 ZIM 中，Shape 继承自 CreateJS 的 Shape
+                // 可以设置 compositeOperation 属性
+                eraserShape.compositeOperation = "destination-out";
+
+                // 创建 MotionController 来跟踪鼠标
+                const eraserController = new MotionController({
+                    target: eraserShape,
+                    type: "pressmove",
+                    speed: 0,
+                    damp: 1
+                });
+
+                // 在 pressdown 时开始绘制
+                eraserShape.on("mousedown", (e) => {
+                    isDrawing = true;
+                    initAudio();
+                    eraserLastPoint = { x: e.stageX, y: e.stageY };
+
+                    // 开始新的路径
+                    eraserShape.graphics.s("rgba(0,0,0,1)");
+                    eraserShape.graphics.ss(brushSize * 3, "round", "round");
+                    eraserShape.graphics.mt(e.stageX, e.stageY);
+                });
+
+                // 在 pressmove 时继续绘制
+                eraserShape.on("pressmove", (e) => {
+                    if (!isDrawing || !eraserLastPoint) return;
+
+                    eraserShape.graphics.lt(e.stageX, e.stageY);
+                    eraserLastPoint = { x: e.stageX, y: e.stageY };
+
+                    // 强制更新
+                    S.update();
+                });
+
+                // 在 pressup 时结束绘制并固化
+                eraserShape.on("pressup", () => {
+                    if (!isDrawing) return;
+                    isDrawing = false;
+                    eraserLastPoint = null;
+
+                    // 固化擦除效果
+                    // 将当前 canvas 内容保存为 Bitmap
+                    try {
+                        const dataURL = S.canvas.toDataURL("image/png");
+                        const img = new Image();
+                        img.onload = () => {
+                            // 移除橡皮擦 Shape
+                            eraserShape.removeFrom();
+                            eraserShape = null;
+
+                            // 清空 drawLayer
+                            drawLayer.removeAllChildren();
+
+                            // 添加固化后的图片
+                            const bitmap = new Bitmap(img).addTo(drawLayer);
+                            bitmap.pos(0, 0);
+
+                            S.update();
+                            saveHistory();
+                        };
+                        img.src = dataURL;
+                    } catch (e) {
+                        saveHistory();
+                    }
+                });
+
+                return eraserController;
+            }
+
+            function createBrush(type) {
+                // 清理之前的笔刷
+                if (currentController) {
+                    currentController.dispose();
+                    currentController = null;
+                }
+                if (currentPen) {
+                    currentPen.dispose();
+                    currentPen = null;
+                }
+
+                // 如果是橡皮擦，使用自定义实现
+                if (type === BrushType.ERASER) {
+                    currentController = setupEraser();
+                    updatePreview();
+                    return null;
+                }
+
+                const baseSize = brushSize;
+                let penConfig = {};
+
+                switch (type) {
+                    case BrushType.SPLATTER:
+                        penConfig = {
+                            color: [currentColor, darken(currentColor, .15), lighten(currentColor, .1)],
+                            penType: "splatter",
+                            size: { min: baseSize * 0.7, max: baseSize * 1.3 },
+                            spread: { min: 2, max: Math.max(10, baseSize * 2) },
+                            move: false
+                        };
+                        break;
+                    case BrushType.LINE:
+                        penConfig = {
+                            color: [darken(currentColor, .3), darken(currentColor, .5)],
+                            penType: "line",
+                            size: { min: baseSize * 0.5, max: baseSize },
+                            move: false
+                        };
+                        break;
+                    case BrushType.INK:
+                        penConfig = {
+                            color: [darken(currentColor, .5), darken(currentColor, .7)],
+                            penType: "line",
+                            size: { min: baseSize * 0.3, max: baseSize * 0.8 },
+                            move: false
+                        };
+                        break;
+                    case BrushType.STAMP:
+                        penConfig = {
+                            color: [currentColor],
+                            penType: "line",
+                            size: { min: baseSize, max: baseSize * 1.5 },
+                            move: false
+                        };
+                        break;
+                    case BrushType.SYMMETRY:
+                        penConfig = {
+                            color: [currentColor, lighten(currentColor, .2)],
+                            penType: "line",
+                            size: { min: baseSize * 0.5, max: baseSize },
+                            move: false
+                        };
+                        break;
+                }
+
+                currentPen = new Pen(penConfig).addTo(drawLayer);
+                currentPen.alp(brushAlpha);
+
+                currentPen.on("pressdown", () => {
+                    isDrawing = true;
+                    initAudio();
+                });
+                currentPen.on("pressup", () => {
+                    isDrawing = false;
+                    saveHistory();
+                });
+
+                currentController = new MotionController(currentPen, "pressmove");
+                updatePreview();
+                return currentPen;
+            }
+
+            createBrush(BrushType.SPLATTER);
+
+            // 对称绘画辅助线
+            let symmetryLines = [];
+            function updateSymmetryLines() {
+                symmetryLines.forEach(l => l.removeFrom());
+                symmetryLines = [];
+                if (!isSymmetryMode) return;
+
+                const lineColor = "rgba(196, 149, 106, 0.3)";
+                symmetryLines.push(new Line(H, 1, lineColor).addTo(previewLayer).rot(90).pos(W / 2, 0));
+                symmetryLines.push(new Line(W, 1, lineColor).addTo(previewLayer).pos(0, H / 2));
+            }
+
+            // ========== 5. 底部工具栏 ==========
+            const toolbar = new Container(W, btnH).addTo().pos(0, 0, LEFT, BOTTOM);
+            new Rectangle(W, btnH, C_TOOLBAR).addTo(toolbar).alp(0.96);
+            new Rectangle(W, 1, C_TOOLBAR_BORDER).addTo(toolbar).pos(0, 0);
+
+            const totalBtns = 9;
+            const btnW = W / totalBtns;
+
+            const brushData = [
+                { type: BrushType.SPLATTER, label: "喷溅" },
+                { type: BrushType.LINE, label: "线条" },
+                { type: BrushType.INK, label: "墨线" },
+                { type: BrushType.ERASER, label: "橡皮" },
+                { type: BrushType.STAMP, label: "印章" },
+                { type: BrushType.SYMMETRY, label: "对称" }
+            ];
+
+            let activeBrushBtn = null;
+            let brushButtons = [];
+
+            brushData.forEach((data, i) => {
+                const btn = new Button({
+                    width: btnW, height: btnH, label: data.label,
+                    bgColor: i === 0 ? C_ACCENT : C_TOOLBAR,
+                    rollBgColor: C_ACCENT_LIGHT,
+                    color: i === 0 ? C_TOOLBAR : C_TEXT,
+                    rollColor: C_TOOLBAR,
+                    corner: 0, shadowColor: -1
+                }).addTo(toolbar).pos(i * btnW, 0);
+
+                btn.on("click", () => {
+                    if (activeBrushBtn) {
+                        activeBrushBtn.bgColor = C_TOOLBAR;
+                        activeBrushBtn.color = C_TEXT;
+                    }
+                    btn.bgColor = C_ACCENT;
+                    btn.color = C_TOOLBAR;
+                    activeBrushBtn = btn;
+                    currentBrush = data.type;
+
+                    if (data.type === BrushType.SYMMETRY) {
+                        isSymmetryMode = !isSymmetryMode;
+                        updateSymmetryLines();
+                        showToast(isSymmetryMode ? "对称模式：开启" : "对称模式：关闭");
+                    } else {
+                        isSymmetryMode = false;
+                        updateSymmetryLines();
+                    }
+
+                    createBrush(data.type);
+                });
+
+                if (i === 0) activeBrushBtn = btn;
+                brushButtons.push(btn);
+            });
+
+            new Rectangle(1, btnH - 20, C_TOOLBAR_BORDER).addTo(toolbar).pos(6 * btnW, 10);
+
+            let undoBtn, redoBtn;
+
+            undoBtn = new Button({
+                width: btnW, height: btnH, label: "撤销", corner: 0,
+                bgColor: C_TOOLBAR, rollBgColor: C_INFO,
+                color: C_TEXT, rollColor: C_TEXT, shadowColor: -1
+            }).addTo(toolbar).pos(6 * btnW, 0);
+            undoBtn.on("click", undo);
+
+            redoBtn = new Button({
+                width: btnW, height: btnH, label: "重做", corner: 0,
+                bgColor: C_TOOLBAR, rollBgColor: C_INFO,
+                color: C_TEXT, rollColor: C_TEXT, shadowColor: -1
+            }).addTo(toolbar).pos(7 * btnW, 0);
+            redoBtn.on("click", redo);
+
+            const clearBtn = new Button({
+                width: btnW, height: btnH, label: "清空", corner: 0,
+                bgColor: C_TOOLBAR, rollBgColor: C_DANGER,
+                color: C_TEXT, rollColor: C_TEXT, shadowColor: -1
+            }).addTo(toolbar).pos(8 * btnW, 0);
+            clearBtn.on("click", clearCanvas);
+
+            updateUndoRedoButtons();
+
+            // ========== 6. 笔刷设置浮层面板 ==========
+            const panelH = isMobile ? 280 : 200;
+            const settingsPanel = new Container(W, panelH).addTo().pos(0, -panelH, LEFT, BOTTOM);
+            new Rectangle(W, panelH, C_TOOLBAR).addTo(settingsPanel).alp(0.98);
+            new Rectangle(W, 1, C_ACCENT).addTo(settingsPanel).pos(0, panelH - 1);
+
+            const closeBtn = new Label({ text: "\u2715", size: 20, color: C_TEXT_DIM })
+                .addTo(settingsPanel).pos(W - 40, 15);
+            closeBtn.cursor = "pointer";
+            closeBtn.on("click", hideSettings);
+
+            // 预览圆圈
+            previewCircle = new Circle(brushSize, C_ACCENT).addTo(settingsPanel).pos(W - 80, panelH / 2);
+            new Circle(brushSize + 2, C_TOOLBAR_BORDER).addTo(settingsPanel).pos(W - 80, panelH / 2).ord(-1);
+
+            // 大小调节
+            new Label({ text: "笔刷大小", size: 14, color: C_TEXT }).addTo(settingsPanel).pos(30, 20);
+            const sizeLabel = new Label({ text: String(brushSize), size: 14, color: C_ACCENT })
+                .addTo(settingsPanel).pos(110, 20);
+
+            const sizeTrack = new Rectangle(W - 60, 8, C_TOOLBAR_BORDER).addTo(settingsPanel).pos(30, 55);
+            const sizeThumb = new Circle(16, C_ACCENT).addTo(settingsPanel).pos(30, 55);
+            let sizeDragging = false;
+
+            function updateSizeThumb() {
+                const ratio = (brushSize - 1) / 39;
+                sizeThumb.pos(30 + ratio * (W - 60), 55);
+            }
+            updateSizeThumb();
+
+            sizeThumb.on("mousedown", () => { sizeDragging = true; });
+            S.on("stagemousemove", (e) => {
+                if (!sizeDragging) return;
+                const local = settingsPanel.globalToLocal(e.stageX, e.stageY);
+                const ratio = Math.max(0, Math.min(1, (local.x - 30) / (W - 60)));
+                brushSize = Math.round(1 + ratio * 39);
+                sizeLabel.text = brushSize;
+                updateSizeThumb();
+                if (currentPen && currentBrush !== BrushType.ERASER) {
+                    const bs = brushSize;
+                    if (currentBrush === BrushType.SPLATTER) {
+                        currentPen.size = { min: bs * 0.7, max: bs * 1.3 };
+                        currentPen.spread = { min: 2, max: Math.max(10, bs * 2) };
+                    } else {
+                        currentPen.size = { min: bs * 0.5, max: bs };
+                    }
+                }
+                updatePreview();
+            });
+            S.on("stagemouseup", () => { sizeDragging = false; });
+            sizeTrack.on("mousedown", (e) => {
+                const local = settingsPanel.globalToLocal(e.stageX, e.stageY);
+                const ratio = Math.max(0, Math.min(1, (local.x - 30) / (W - 60)));
+                brushSize = Math.round(1 + ratio * 39);
+                sizeLabel.text = brushSize;
+                updateSizeThumb();
+                if (currentPen && currentBrush !== BrushType.ERASER) {
+                    const bs = brushSize;
+                    if (currentBrush === BrushType.SPLATTER) {
+                        currentPen.size = { min: bs * 0.7, max: bs * 1.3 };
+                        currentPen.spread = { min: 2, max: Math.max(10, bs * 2) };
+                    } else {
+                        currentPen.size = { min: bs * 0.5, max: bs };
+                    }
+                }
+                updatePreview();
+            });
+
+            // 透明度
+            new Label({ text: "透明度", size: 14, color: C_TEXT }).addTo(settingsPanel).pos(30, 95);
+            const alphaLabel = new Label({ text: "100%", size: 14, color: C_ACCENT })
+                .addTo(settingsPanel).pos(100, 95);
+
+            const alphaTrack = new Rectangle(W - 60, 8, C_TOOLBAR_BORDER).addTo(settingsPanel).pos(30, 130);
+            const alphaThumb = new Circle(16, C_ACCENT).addTo(settingsPanel).pos(30, 130);
+            let alphaDragging = false;
+
+            function updateAlphaThumb() {
+                const ratio = (brushAlpha - 0.1) / 0.9;
+                alphaThumb.pos(30 + ratio * (W - 60), 130);
+            }
+            updateAlphaThumb();
+
+            alphaThumb.on("mousedown", () => { alphaDragging = true; });
+            S.on("stagemousemove", (e) => {
+                if (!alphaDragging) return;
+                const local = settingsPanel.globalToLocal(e.stageX, e.stageY);
+                const ratio = Math.max(0, Math.min(1, (local.x - 30) / (W - 60)));
+                brushAlpha = Math.round((0.1 + ratio * 0.9) * 10) / 10;
+                alphaLabel.text = Math.round(brushAlpha * 100) + "%";
+                updateAlphaThumb();
+                if (currentPen) currentPen.alp(brushAlpha);
+            });
+            S.on("stagemouseup", () => { alphaDragging = false; });
+            alphaTrack.on("mousedown", (e) => {
+                const local = settingsPanel.globalToLocal(e.stageX, e.stageY);
+                const ratio = Math.max(0, Math.min(1, (local.x - 30) / (W - 60)));
+                brushAlpha = Math.round((0.1 + ratio * 0.9) * 10) / 10;
+                alphaLabel.text = Math.round(brushAlpha * 100) + "%";
+                updateAlphaThumb();
+                if (currentPen) currentPen.alp(brushAlpha);
+            });
+
+            // 颜色选择
+            new Label({ text: "颜色", size: 14, color: C_TEXT }).addTo(settingsPanel).pos(30, 160);
+            const colorPresets = [
+                brown, darken(brown, .2), lighten(brown, .1),
+                "#8B4513", "#D2691E",
+                "#CD853F", "#DEB887",
+                "#F4A460", "#DAA520",
+                "#B8860B", "#D2B48C",
+                "#C4956A"
+            ];
+
+            let selectedColorIndicator = null;
+
+            colorPresets.forEach((c, i) => {
+                const colorBtn = new Circle(14, c).addTo(settingsPanel).pos(80 + i * 35, 168);
+                colorBtn.cursor = "pointer";
+                if (i === 0) {
+                    selectedColorIndicator = new Circle(18, C_ACCENT).addTo(settingsPanel)
+                        .pos(80 + i * 35, 168).alp(0.5).ord(-1);
+                }
+                colorBtn.on("click", () => {
+                    currentColor = c;
+                    createBrush(currentBrush);
+                    if (selectedColorIndicator) {
+                        selectedColorIndicator.pos(80 + i * 35, 168);
+                    }
+                });
+            });
+
+            let panelOpen = false;
+            function showSettings() {
+                if (panelOpen) return;
+                panelOpen = true;
+                settingsPanel.animate({ y: -btnH }, 0.25, "easeOutBack");
+            }
+            function hideSettings() {
+                if (!panelOpen) return;
+                panelOpen = false;
+                settingsPanel.animate({ y: -panelH }, 0.2, "easeIn");
+            }
+
+            brushButtons.forEach(btn => {
+                let pressTimer = null;
+                btn.on("mousedown", () => {
+                    pressTimer = timeout(0.5, () => {
+                        showSettings();
+                        pressTimer = null;
+                    });
+                });
+                btn.on("mouseup", () => {
+                    if (pressTimer) { pressTimer.clear(); pressTimer = null; }
+                });
+            });
+
+            // ========== 7. 功能实现 ==========
+            function clearCanvas() {
+                const overlay = new Rectangle(W, H, "rgba(0,0,0,0.5)").addTo().alp(0);
+                overlay.animate({ alpha: 1 }, 0.2);
+
+                const dialog = new Container(340, 180).addTo().center();
+                new Rectangle(340, 180, C_TOOLBAR).addTo(dialog).reg(CENTER).pos(170, 90).corner = 14;
+                new Label({ text: "确定要清空画布吗？", size: 18, color: C_TEXT, align: CENTER })
+                    .addTo(dialog).pos(170, 50);
+
+                const yesBtn = new Button({
+                    width: 110, height: 48, label: "确定", corner: 8,
+                    bgColor: C_DANGER, color: C_TEXT, shadowColor: -1
+                }).addTo(dialog).pos(50, 110);
+
+                const noBtn = new Button({
+                    width: 110, height: 48, label: "取消", corner: 8,
+                    bgColor: C_TOOLBAR_BORDER, color: C_TEXT, shadowColor: -1
+                }).addTo(dialog).pos(180, 110);
+
+                yesBtn.on("click", () => {
+                    drawLayer.removeAllChildren();
+                    historyStack = [];
+                    historyIndex = -1;
+                    updateUndoRedoButtons();
+                    overlay.removeFrom();
+                    dialog.removeFrom();
+                    S.update();
+                });
+                noBtn.on("click", () => {
+                    overlay.removeFrom();
+                    dialog.removeFrom();
+                    S.update();
+                });
+            }
+
+            // 保存图片功能增强
+            function saveImage(format) {
+                toolbar.visible = false;
+                settingsPanel.visible = false;
+                S.update();
+                setTimeout(() => {
+                    let dataURL, ext;
+                    switch (format) {
+                        case "jpg":
+                            ext = "jpg";
+                            dataURL = S.canvas.toDataURL("image/jpeg", 0.9);
+                            break;
+                        case "webp":
+                            ext = "webp";
+                            dataURL = S.canvas.toDataURL("image/webp", 0.9);
+                            break;
+                        default:
+                            ext = "png";
+                            dataURL = S.canvas.toDataURL("image/png");
+                    }
+                    const link = document.createElement("a");
+                    link.download = "sand-art-" + Date.now() + "." + ext;
+                    link.href = dataURL;
+                    link.click();
+                    toolbar.visible = true;
+                    settingsPanel.visible = true;
+                    S.update();
+                    showToast("图片已保存！");
+                }, 100);
+            }
+
+            function shareImage() {
+                toolbar.visible = false;
+                settingsPanel.visible = false;
+                S.update();
+                setTimeout(() => {
+                    const dataURL = S.canvas.toDataURL("image/png");
+                    toolbar.visible = true;
+                    settingsPanel.visible = true;
+                    S.update();
+
+                    if (navigator.share) {
+                        fetch(dataURL)
+                            .then(res => res.blob())
+                            .then(blob => {
+                                const file = new File([blob], "sand-art.png", { type: "image/png" });
+                                navigator.share({
+                                    title: "我的沙画作品",
+                                    text: "用沙画绘图板创作的作品",
+                                    files: [file]
+                                }).catch(() => {
+                                    showCopyDialog(dataURL);
+                                });
+                            });
+                    } else {
+                        showCopyDialog(dataURL);
+                    }
+                }, 100);
+            }
+
+            function showCopyDialog(dataURL) {
+                const dialog = new Container(400, 200).addTo().center();
+                new Rectangle(400, 200, C_TOOLBAR).addTo(dialog).reg(CENTER).pos(200, 100).corner = 14;
+                new Label({ text: "分享功能", size: 18, color: C_TEXT, align: CENTER })
+                    .addTo(dialog).pos(200, 40);
+                new Label({ text: "您的浏览器不支持直接分享", size: 14, color: C_TEXT_DIM, align: CENTER })
+                    .addTo(dialog).pos(200, 70);
+                new Label({ text: "图片已生成，可长按保存", size: 12, color: C_TEXT_DIM, align: CENTER })
+                    .addTo(dialog).pos(200, 95);
+
+                const okBtn = new Button({
+                    width: 120, height: 44, label: "确定", corner: 8,
+                    bgColor: C_ACCENT, color: C_TOOLBAR, shadowColor: -1
+                }).addTo(dialog).pos(140, 130);
+
+                okBtn.on("click", () => {
+                    dialog.removeFrom();
+                    S.update();
+                });
+            }
+
+            function showToast(msg) {
+                const toast = new Container(280, 50).addTo().center();
+                new Rectangle(280, 50, C_SUCCESS).addTo(toast).reg(CENTER).pos(140, 25).corner = 25;
+                new Label({ text: msg, size: 16, color: C_TEXT, align: CENTER }).addTo(toast).pos(140, 15);
+                toast.alp(0).animate({ alpha: 1 }, 0.3);
+                timeout(2, () => {
+                    toast.animate({ alpha: 0 }, 0.3, null, () => toast.removeFrom());
+                });
+            }
+
+            // ========== 8. 顶部标题栏 ==========
+            const topBar = new Container(W, 40).addTo().pos(0, 0, LEFT, TOP);
+            new Rectangle(W, 40, C_TOOLBAR).addTo(topBar).alp(0.9);
+            new Rectangle(W, 1, C_TOOLBAR_BORDER).addTo(topBar).pos(0, 39);
+            new Label({ text: "沙画绘图板", size: 16, color: C_TEXT }).addTo(topBar).pos(20, 10);
+
+            const toolsBtn = new Label({ text: "\u2699\uFE0F 设置", size: 13, color: C_TEXT_DIM })
+                .addTo(topBar).pos(W - 280, 12);
+            toolsBtn.cursor = "pointer";
+            toolsBtn.on("click", () => {
+                if (panelOpen) hideSettings(); else showSettings();
+            });
+
+            const saveMenuBtn = new Label({ text: "\uD83D\uDCBE 保存", size: 13, color: C_TEXT_DIM })
+                .addTo(topBar).pos(W - 200, 12);
+            saveMenuBtn.cursor = "pointer";
+            saveMenuBtn.on("click", () => showSaveMenu());
+
+            const shareBtn = new Label({ text: "\uD83D\uDCE4 分享", size: 13, color: C_TEXT_DIM })
+                .addTo(topBar).pos(W - 120, 12);
+            shareBtn.cursor = "pointer";
+            shareBtn.on("click", shareImage);
+
+            // 保存菜单
+            let saveMenuOpen = false;
+            let saveMenuPanel = null;
+
+            function showSaveMenu() {
+                if (saveMenuOpen) {
+                    if (saveMenuPanel) saveMenuPanel.removeFrom();
+                    saveMenuOpen = false;
+                    S.update();
+                    return;
+                }
+                saveMenuOpen = true;
+
+                saveMenuPanel = new Container(160, 140).addTo().pos(W - 210, 45);
+                new Rectangle(160, 140, C_TOOLBAR).addTo(saveMenuPanel).corner = 8;
+                new Rectangle(160, 1, C_TOOLBAR_BORDER).addTo(saveMenuPanel).pos(0, 0);
+
+                const formats = [
+                    { label: "保存 PNG", format: "png" },
+                    { label: "保存 JPG", format: "jpg" },
+                    { label: "保存 WebP", format: "webp" }
+                ];
+
+                formats.forEach((f, i) => {
+                    const item = new Label({ text: f.label, size: 14, color: C_TEXT })
+                        .addTo(saveMenuPanel).pos(20, 15 + i * 40);
+                    item.cursor = "pointer";
+                    item.on("click", () => {
+                        saveImage(f.format);
+                        saveMenuPanel.removeFrom();
+                        saveMenuOpen = false;
+                    });
+                });
+
+                S.update();
+            }
+
+            // ========== 9. 双指捏合 + 压力感应 ==========
+            if (isMobile) {
+                let initialDist = 0;
+                let initialSize = brushSize;
+
+                S.on("touchstart", (e) => {
+                    if (e.nativeEvent.touches && e.nativeEvent.touches.length === 2) {
+                        const t1 = e.nativeEvent.touches[0];
+                        const t2 = e.nativeEvent.touches[1];
+                        initialDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+                        initialSize = brushSize;
+                    }
+                });
+
+                S.on("touchmove", (e) => {
+                    if (e.nativeEvent.touches && e.nativeEvent.touches.length === 2) {
+                        e.nativeEvent.preventDefault();
+                        const t1 = e.nativeEvent.touches[0];
+                        const t2 = e.nativeEvent.touches[1];
+                        const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+                        const scale = dist / (initialDist || 1);
+                        const newSize = Math.max(1, Math.min(40, Math.round(initialSize * scale)));
+                        if (newSize !== brushSize) {
+                            brushSize = newSize;
+                            sizeLabel.text = brushSize;
+                            updateSizeThumb();
+                            if (currentPen && currentBrush !== BrushType.ERASER) {
+                                const bs = brushSize;
+                                if (currentBrush === BrushType.SPLATTER) {
+                                    currentPen.size = { min: bs * 0.7, max: bs * 1.3 };
+                                    currentPen.spread = { min: 2, max: Math.max(10, bs * 2) };
+                                } else {
+                                    currentPen.size = { min: bs * 0.5, max: bs };
+                                }
+                            }
+                            updatePreview();
+                        }
+                    }
+                });
+            }
+
+            // 压力感应
+            if (window.PointerEvent) {
+                S.canvas.addEventListener("pointerdown", (e) => {
+                    if (e.pressure && e.pressure > 0) {
+                        const pressureSize = Math.max(1, Math.min(40, Math.round(brushSize * e.pressure * 2)));
+                        if (currentPen && currentBrush !== BrushType.ERASER) {
+                            currentPen.size = { min: pressureSize * 0.5, max: pressureSize };
+                        }
+                    }
+                });
+            }
+
+            // ========== 10. 键盘快捷键 ==========
+            document.addEventListener("keydown", (e) => {
+                const key = e.key.toLowerCase();
+                switch (key) {
+                    case '1': if (brushButtons[0]) brushButtons[0].dispatchEvent("click"); break;
+                    case '2': if (brushButtons[1]) brushButtons[1].dispatchEvent("click"); break;
+                    case '3': if (brushButtons[2]) brushButtons[2].dispatchEvent("click"); break;
+                    case '4': if (brushButtons[3]) brushButtons[3].dispatchEvent("click"); break;
+                    case '5': if (brushButtons[4]) brushButtons[4].dispatchEvent("click"); break;
+                    case '6': if (brushButtons[5]) brushButtons[5].dispatchEvent("click"); break;
+                    case 'z':
+                        if (e.ctrlKey || e.metaKey) {
+                            if (e.shiftKey) redo(); else undo();
+                        } else {
+                            undo();
+                        }
+                        break;
+                    case 'y':
+                        if (e.ctrlKey || e.metaKey) redo();
+                        break;
+                    case 'c': clearCanvas(); break;
+                    case 's':
+                        if (e.ctrlKey || e.metaKey) {
+                            e.preventDefault();
+                            saveImage("png");
+                        }
+                        break;
+                    case '[':
+                        brushSize = Math.max(1, brushSize - 1);
+                        sizeLabel.text = brushSize;
+                        updateSizeThumb();
+                        createBrush(currentBrush);
+                        break;
+                    case ']':
+                        brushSize = Math.min(40, brushSize + 1);
+                        sizeLabel.text = brushSize;
+                        updateSizeThumb();
+                        createBrush(currentBrush);
+                        break;
+                }
+            });
+
+            // ========== 11. 横屏锁定 ==========
+            if (isMobile) {
+                if (screen.orientation && screen.orientation.lock) {
+                    screen.orientation.lock("landscape").catch(() => { });
+                }
+                window.addEventListener("orientationchange", () => {
+                    if (window.orientation === 0 || window.orientation === 180) {
+                        document.getElementById("rotate-hint").style.display = "flex";
+                    } else {
+                        document.getElementById("rotate-hint").style.display = "none";
+                    }
+                });
+            }
+
+            // ========== 12. 自动保存草稿 ==========
+            function autoSave() {
+                try {
+                    const dataURL = S.canvas.toDataURL("image/png");
+                    localStorage.setItem("zim-sand-autosave", dataURL);
+                    localStorage.setItem("zim-sand-autosave-time", Date.now());
+                } catch (e) { }
+            }
+
+            interval(30, autoSave);
+            window.addEventListener("beforeunload", autoSave);
+
+            function loadAutoSave() {
+                try {
+                    const saved = localStorage.getItem("zim-sand-autosave");
+                    const savedTime = localStorage.getItem("zim-sand-autosave-time");
+                    if (saved && savedTime) {
+                        const timeDiff = Date.now() - parseInt(savedTime);
+                        const hoursAgo = Math.floor(timeDiff / 3600000);
+                        const msg = hoursAgo > 0
+                            ? `检测到 ${hoursAgo} 小时前的草稿，是否恢复？`
+                            : "检测到之前的草稿，是否恢复？";
+
+                        const dialog = new Container(400, 180).addTo().center();
+                        new Rectangle(400, 180, C_TOOLBAR).addTo(dialog).reg(CENTER).pos(200, 90).corner = 14;
+                        new Label({ text: msg, size: 16, color: C_TEXT, align: CENTER })
+                            .addTo(dialog).pos(200, 50);
+
+                        const yesBtn = new Button({
+                            width: 110, height: 48, label: "恢复", corner: 8,
+                            bgColor: C_SUCCESS, color: C_TEXT, shadowColor: -1
+                        }).addTo(dialog).pos(60, 110);
+
+                        const noBtn = new Button({
+                            width: 110, height: 48, label: "新建", corner: 8,
+                            bgColor: C_TOOLBAR_BORDER, color: C_TEXT, shadowColor: -1
+                        }).addTo(dialog).pos(230, 110);
+
+                        yesBtn.on("click", () => {
+                            const img = new Image();
+                            img.onload = () => {
+                                drawLayer.removeAllChildren();
+                                new Bitmap(img).addTo(drawLayer);
+                                saveHistory();
+                                S.update();
+                            };
+                            img.src = saved;
+                            dialog.removeFrom();
+                        });
+                        noBtn.on("click", () => {
+                            localStorage.removeItem("zim-sand-autosave");
+                            localStorage.removeItem("zim-sand-autosave-time");
+                            dialog.removeFrom();
+                            S.update();
+                        });
+                    }
+                } catch (e) { }
+            }
+
+            // ========== 13. 欢迎界面 ==========
+            if (!localStorage.getItem("zim-sand-v18")) {
+                const overlay = new Rectangle(W, H, "rgba(0,0,0,0.7)").addTo();
+                const box = new Container(440, 380).addTo().center();
+                new Rectangle(440, 380, C_TOOLBAR).addTo(box).reg(CENTER).pos(220, 190).corner = 18;
+                new Rectangle(80, 4, C_ACCENT).addTo(box).pos(180, 35);
+                new Label({ text: "沙画绘图板", size: 28, color: C_TEXT, align: CENTER })
+                    .addTo(box).pos(220, 55);
+
+                new Label({
+                    text: "单指绘画    双指捏合调大小\n\n长按笔刷按钮打开详细设置\n\n快捷键：1-6 切换笔刷 | Z 撤销 | Y 重做\n[ ] 调整大小 | Ctrl+S 保存",
+                    size: 14, color: C_TEXT_DIM, align: CENTER, lineHeight: 26
+                }).addTo(box).pos(220, 100);
+
+                const startBtn = new Button({
+                    width: 160, height: 52, label: "开始创作", corner: 10,
+                    bgColor: C_ACCENT, color: C_TOOLBAR, shadowColor: -1
+                }).addTo(box).pos(140, 300);
+
+                startBtn.on("click", () => {
+                    overlay.animate({ alpha: 0 }, 0.3, null, () => overlay.removeFrom());
+                    box.animate({ alpha: 0, scale: 0.9 }, 0.3, null, () => {
+                        box.removeFrom();
+                        loadAutoSave();
+                    });
+                    localStorage.setItem("zim-sand-v18", "true");
+                });
+            } else {
+                loadAutoSave();
+            }
+
+            // 初始保存历史记录
+            timeout(1, saveHistory);
+        }
+    </script>
+</body>
+
+</html>
